@@ -3,10 +3,22 @@
   "version": "2026.2.4",
   "description": "WhatsApp gateway CLI (Baileys web) with Pi RPC agent",
   "keywords": [],
+  "homepage": "https://github.com/openclaw/openclaw#readme",
+  "bugs": {
+    "url": "https://github.com/openclaw/openclaw/issues"
+  },
   "license": "MIT",
   "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/openclaw/openclaw.git"
+  },
   "bin": {
     "openclaw": "openclaw.mjs"
+  },
+  "directories": {
+    "doc": "docs",
+    "test": "test"
   },
   "files": [
     "assets/",
@@ -240,17 +252,5 @@
       "apps/macos/.build/**",
       "dist/OpenClaw.app/**"
     ]
-  },
-  "directories": {
-    "doc": "docs",
-    "test": "test"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/openclaw/openclaw.git"
-  },
-  "bugs": {
-    "url": "https://github.com/openclaw/openclaw/issues"
-  },
-  "homepage": "https://github.com/openclaw/openclaw#readme"
+  }
 }
