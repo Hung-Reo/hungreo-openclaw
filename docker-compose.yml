@@ -1,26 +1,24 @@
 services:
   openclaw-gateway:
     image: ${OPENCLAW_IMAGE:-openclaw:local}
-    extra_hosts:
-      - "api.anthropic.com:160.79.104.10"
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
     environment:
       HOME: /home/node
       TERM: xterm-256color
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
-      BRAVE_API_KEY: ${BRAVE_API_KEY}
+      PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
       CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "0"
     ports:
-      - "127.0.0.1:${OPENCLAW_GATEWAY_PORT:-18789}:18789"
-      - "127.0.0.1:${OPENCLAW_BRIDGE_PORT:-18790}:18790"
+      - "${OPENCLAW_GATEWAY_PORT:-18789}:${OPENCLAW_GATEWAY_PORT:-18789}"
+      - "${OPENCLAW_BRIDGE_PORT:-18790}:${OPENCLAW_BRIDGE_PORT:-18790}"
     init: true
     restart: unless-stopped
     command:
@@ -31,7 +29,7 @@ services:
         "--bind",
         "${OPENCLAW_GATEWAY_BIND:-lan}",
         "--port",
-        "18789",
+        "${OPENCLAW_GATEWAY_PORT:-18789}",
       ]
 
   openclaw-cli:
@@ -40,12 +38,12 @@ services:
       HOME: /home/node
       TERM: xterm-256color
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+      PERPLEXITY_API_KEY: ${PERPLEXITY_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       BROWSER: echo
-      BRAVE_API_KEY: ${BRAVE_API_KEY}
       CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
       CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
