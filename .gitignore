@@ -1,7 +1,6 @@
 node_modules
 **/node_modules/
 .env
-.env.suckhoe
 docker-compose.extra.yml
 dist
 *.bun-build
@@ -65,11 +64,9 @@ apps/ios/*.mobileprovision
 
 # Local untracked files
 .local/
-.vscode/
 IDENTITY.md
 USER.md
 .tgz
-memory/family/*.md
 
 # local tooling
 .serena/
