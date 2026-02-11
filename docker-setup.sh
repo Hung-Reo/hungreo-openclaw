@@ -31,7 +31,7 @@ export OPENCLAW_CONFIG_DIR
 export OPENCLAW_WORKSPACE_DIR
 export OPENCLAW_GATEWAY_PORT="${OPENCLAW_GATEWAY_PORT:-18789}"
 export OPENCLAW_BRIDGE_PORT="${OPENCLAW_BRIDGE_PORT:-18790}"
-export OPENCLAW_GATEWAY_BIND="${OPENCLAW_GATEWAY_BIND:-loopback}"
+export OPENCLAW_GATEWAY_BIND="${OPENCLAW_GATEWAY_BIND:-lan}"
 export OPENCLAW_IMAGE="$IMAGE_NAME"
 export OPENCLAW_DOCKER_APT_PACKAGES="${OPENCLAW_DOCKER_APT_PACKAGES:-}"
 export OPENCLAW_EXTRA_MOUNTS="$EXTRA_MOUNTS"
@@ -128,20 +128,17 @@ upsert_env() {
   shift
   local -a keys=("$@")
   local tmp
-  local seen_keys=""
-  local key
-  local k
-  local replaced
   tmp="$(mktemp)"
+  declare -A seen=()
 
   if [[ -f "$file" ]]; then
     while IFS= read -r line || [[ -n "$line" ]]; do
-      key="${line%%=*}"
-      replaced=false
+      local key="${line%%=*}"
+      local replaced=false
       for k in "${keys[@]}"; do
         if [[ "$key" == "$k" ]]; then
           printf '%s=%s\n' "$k" "${!k-}" >>"$tmp"
-          seen_keys="${seen_keys}|${k}|"
+          seen["$k"]=1
           replaced=true
           break
         fi
@@ -153,7 +150,7 @@ upsert_env() {
   fi
 
   for k in "${keys[@]}"; do
-    if [[ "$seen_keys" != *"|${k}|"* ]]; then
+    if [[ -z "${seen[$k]:-}" ]]; then
       printf '%s=%s\n' "$k" "${!k-}" >>"$tmp"
     fi
   done
@@ -168,7 +165,6 @@ upsert_env "$ENV_FILE" \
   OPENCLAW_BRIDGE_PORT \
   OPENCLAW_GATEWAY_BIND \
   OPENCLAW_GATEWAY_TOKEN \
-  BRAVE_API_KEY \
   OPENCLAW_IMAGE \
   OPENCLAW_EXTRA_MOUNTS \
   OPENCLAW_HOME_VOLUME \
@@ -184,7 +180,7 @@ docker build \
 echo ""
 echo "==> Onboarding (interactive)"
 echo "When prompted:"
-echo "  - Gateway bind: loopback"
+echo "  - Gateway bind: lan"
 echo "  - Gateway auth: token"
 echo "  - Gateway token: $OPENCLAW_GATEWAY_TOKEN"
 echo "  - Tailscale exposure: Off"

@@ -1,6 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import * as ssrf from "../../../infra/net/ssrf.js";
-import { describeGeminiVideo } from "./video.js";
 
 const TEST_NET_IP = "203.0.113.10";
 
@@ -15,29 +13,36 @@ const resolveRequestUrl = (input: RequestInfo | URL) => {
 };
 
 describe("describeGeminiVideo", () => {
-  let resolvePinnedHostnameSpy: ReturnType<typeof vi.spyOn>;
-
   beforeEach(() => {
-    resolvePinnedHostnameSpy = vi
-      .spyOn(ssrf, "resolvePinnedHostnameWithPolicy")
-      .mockImplementation(async (hostname) => {
-        // SSRF guard pins DNS; stub resolution to avoid live lookups in unit tests.
+    vi.resetModules();
+    vi.doMock("../../../infra/net/ssrf.js", async () => {
+      const actual = await vi.importActual<typeof import("../../../infra/net/ssrf.js")>(
+        "../../../infra/net/ssrf.js",
+      );
+      const resolvePinned = async (hostname: string) => {
         const normalized = hostname.trim().toLowerCase().replace(/\.$/, "");
         const addresses = [TEST_NET_IP];
         return {
           hostname: normalized,
           addresses,
-          lookup: ssrf.createPinnedLookup({ hostname: normalized, addresses }),
+          lookup: actual.createPinnedLookup({ hostname: normalized, addresses }),
         };
-      });
+      };
+      return {
+        ...actual,
+        resolvePinnedHostname: vi.fn(resolvePinned),
+        resolvePinnedHostnameWithPolicy: vi.fn(resolvePinned),
+      };
+    });
   });
 
   afterEach(() => {
-    resolvePinnedHostnameSpy?.mockRestore();
-    resolvePinnedHostnameSpy = undefined;
+    vi.resetModules();
+    vi.clearAllMocks();
   });
 
   it("respects case-insensitive x-goog-api-key overrides", async () => {
+    const { describeGeminiVideo } = await import("./video.js");
     let seenKey: string | null = null;
     const fetchFn = async (_input: RequestInfo | URL, init?: RequestInit) => {
       const headers = new Headers(init?.headers);
@@ -64,6 +69,7 @@ describe("describeGeminiVideo", () => {
   });
 
   it("builds the expected request payload", async () => {
+    const { describeGeminiVideo } = await import("./video.js");
     let seenUrl: string | null = null;
     let seenInit: RequestInit | undefined;
     const fetchFn = async (input: RequestInfo | URL, init?: RequestInit) => {

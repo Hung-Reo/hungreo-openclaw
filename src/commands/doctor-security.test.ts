@@ -11,6 +11,23 @@ vi.mock("../channels/plugins/index.js", () => ({
   listChannelPlugins: () => [],
 }));
 
+vi.mock("../gateway/net.js", () => ({
+  resolveGatewayBindHost: async (bind: string | undefined, customBindHost?: string) => {
+    if (bind === "lan") {
+      return "0.0.0.0";
+    }
+    if (bind === "custom") {
+      return customBindHost?.trim() || "0.0.0.0";
+    }
+    if (bind === "tailnet") {
+      return "100.64.0.1";
+    }
+    return "127.0.0.1";
+  },
+  isLoopbackHost: (host: string) =>
+    host === "::1" || host === "127.0.0.1" || host.startsWith("127."),
+}));
+
 import { noteSecurityWarnings } from "./doctor-security.js";
 
 describe("noteSecurityWarnings gateway exposure", () => {

@@ -1,9 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import * as ssrf from "../../infra/net/ssrf.js";
 
 // Store original fetch
 const originalFetch = globalThis.fetch;
 let mockFetch: ReturnType<typeof vi.fn>;
+const TEST_NET_IP = "203.0.113.10";
+
+vi.mock("../../infra/net/ssrf.js", async () => {
+  const actual =
+    await vi.importActual<typeof import("../../infra/net/ssrf.js")>("../../infra/net/ssrf.js");
+  const resolvePinned = async (hostname: string) => {
+    const normalized = hostname.trim().toLowerCase().replace(/\.$/, "");
+    const addresses = [TEST_NET_IP];
+    return {
+      hostname: normalized,
+      addresses,
+      lookup: actual.createPinnedLookup({ hostname: normalized, addresses }),
+    };
+  };
+  return {
+    ...actual,
+    resolvePinnedHostname: vi.fn(resolvePinned),
+    resolvePinnedHostnameWithPolicy: vi.fn(resolvePinned),
+  };
+});
 
 describe("fetchWithSlackAuth", () => {
   beforeEach(() => {
@@ -172,21 +191,11 @@ describe("resolveSlackMedia", () => {
   beforeEach(() => {
     mockFetch = vi.fn();
     globalThis.fetch = mockFetch as typeof fetch;
-    vi.spyOn(ssrf, "resolvePinnedHostname").mockImplementation(async (hostname) => {
-      const normalized = hostname.trim().toLowerCase().replace(/\.$/, "");
-      const addresses = ["93.184.216.34"];
-      return {
-        hostname: normalized,
-        addresses,
-        lookup: ssrf.createPinnedLookup({ hostname: normalized, addresses }),
-      };
-    });
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
     vi.resetModules();
-    vi.restoreAllMocks();
   });
 
   it("prefers url_private_download over url_private", async () => {

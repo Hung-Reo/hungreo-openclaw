@@ -128,25 +128,14 @@ export function createTelegramBot(opts: TelegramBotOptions) {
     network: telegramCfg.network,
   });
   const shouldProvideFetch = Boolean(fetchImpl);
-  // grammY types RequestInfo against node-fetch in Node, while our wrapper is typed
-  // against the runtime fetch signature. Adapt once at the boundary.
-  type TelegramFetch = NonNullable<ApiClientOptions["fetch"]>;
-  const telegramFetch: TelegramFetch | undefined =
-    shouldProvideFetch && fetchImpl
-      ? (((input: Parameters<TelegramFetch>[0], init?: Parameters<TelegramFetch>[1]) =>
-          fetchImpl(
-            input as Parameters<typeof fetch>[0],
-            init as Parameters<typeof fetch>[1],
-          )) as unknown as TelegramFetch)
-      : undefined;
   const timeoutSeconds =
     typeof telegramCfg?.timeoutSeconds === "number" && Number.isFinite(telegramCfg.timeoutSeconds)
       ? Math.max(1, Math.floor(telegramCfg.timeoutSeconds))
       : undefined;
   const client: ApiClientOptions | undefined =
-    telegramFetch || timeoutSeconds
+    shouldProvideFetch || timeoutSeconds
       ? {
-          ...(telegramFetch ? { fetch: telegramFetch } : {}),
+          ...(shouldProvideFetch && fetchImpl ? { fetch: fetchImpl } : {}),
           ...(timeoutSeconds ? { timeoutSeconds } : {}),
         }
       : undefined;
