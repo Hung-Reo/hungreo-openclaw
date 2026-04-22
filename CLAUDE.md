@@ -7,17 +7,17 @@ This is Hưng's personal fork of [openclaw/openclaw](https://github.com/openclaw
 
 ## Quick orientation
 
-| File | Dùng để |
-|---|---|
-| `LOCAL_CONTEXT.md` | VPS topology, current versions, SSH access, upgrade history, runbook |
-| `AGENTS.md` | Upstream openclaw coding guidelines (không phải VPS context) |
-| `HUNGREO-GOVERNOR-NOTES.md` | Product/strategic notes |
-| `USER.md` | Owner profile |
+| File                        | Dùng để                                                              |
+| --------------------------- | -------------------------------------------------------------------- |
+| `LOCAL_CONTEXT.md`          | VPS topology, current versions, SSH access, upgrade history, runbook |
+| `AGENTS.md`                 | Upstream openclaw coding guidelines (không phải VPS context)         |
+| `HUNGREO-GOVERNOR-NOTES.md` | Product/strategic notes                                              |
+| `USER.md`                   | Owner profile                                                        |
 
 ## VPS — Quick facts (xem LOCAL_CONTEXT.md để biết thêm)
 
-- **Host:** `hung@72.61.123.33` | SSH key: `~/.ssh/hostinger_kvm2`
-- **SSH command:** `ssh -o ConnectTimeout=10 -i ~/.ssh/hostinger_kvm2 hung@72.61.123.33`
+- **Host:** `hung@<VPS_IP>` | SSH key: `~/.ssh/hostinger_kvm2`
+- **SSH command:** `ssh -o ConnectTimeout=10 -i ~/.ssh/hostinger_kvm2 hung@<VPS_IP>`
 - **2 bots chính:** `openclaw-gateway-hungreo` + `openclaw-gateway-suckhoe` (systemd --user)
 - **Bot thứ 3:** `openclaw-gateway-nemotron` → **KHÔNG TOUCH** trừ khi Hưng yêu cầu rõ ràng
 - **Check nhanh:** `systemctl --user is-active openclaw-gateway-hungreo.service openclaw-gateway-suckhoe.service`
@@ -26,9 +26,9 @@ This is Hưng's personal fork of [openclaw/openclaw](https://github.com/openclaw
 
 ## Versions hiện tại (cập nhật: 2026-04-22)
 
-| Component | Version |
-|---|---|
-| openclaw npm | 2026.4.20 (stable, latest) |
+| Component            | Version                    |
+| -------------------- | -------------------------- |
+| openclaw npm         | 2026.4.20 (stable, latest) |
 | lossless-claw plugin | 0.9.2 (tất cả 3 locations) |
 
 ## Upgrade checklist (tóm tắt)

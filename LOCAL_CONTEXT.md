@@ -46,7 +46,7 @@ Policy: File này chỉ lưu topology/context. Không lưu secrets/tokens/privat
 ### SSH access
 
 ```bash
-ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/hostinger_kvm2 hung@72.61.123.33
+ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/hostinger_kvm2 hung@<VPS_IP>
 ```
 
 > **Mobile note:** Key cần có ở `~/.ssh/hostinger_kvm2`. Nếu dùng mobile mà không có key, dùng Termius để SSH thủ công, rồi paste output vào Claude Code.
@@ -132,7 +132,7 @@ systemctl --user restart openclaw-gateway-hungreo.service
   - State: `/home/hung/.openclaw-hungreo/workspace/memory/overnight-research-state.json`
   - Log: `/home/hung/.openclaw-hungreo/workspace/logs/overnight-research.log`
   - Sent flag: `/home/hung/.openclaw-hungreo/workspace/logs/.overnight-brief-sent-YYYY-MM-DD`
-- **Target Telegram:** chat_id `7957776935` (Hưng DM)
+- **Target Telegram:** chat_id `<HUNG_TG_CHAT_ID>` (Hưng DM)
 - **Dedup:** 7-day window via `processed_urls` in state.json
 - **Trigger manual:** `bash scripts/overnight_research_pipeline.sh --dry-run [--force] [--max-items N]`
 - **Plan docs:** Local `~/.claude/plans/vectorized-orbiting-kite.md` + `phase2-actions-log.md`
@@ -238,7 +238,7 @@ Verified on: 2026-04-06 11:45 (+07) — OpenClaw 2026.4.5 (3e72c03)
 
 - Provider: Hostinger VPS
 - Hostname: `srv1367812`
-- SSH entrypoint: `ssh -i /Users/hungdinh/.ssh/hostinger_kvm2 hung@72.61.123.33`
+- SSH entrypoint: `ssh -i ~/.ssh/hostinger_kvm2 hung@<VPS_IP>`
 - Production runtime host(s):
   - `srv1367812`: chạy 2 OpenClaw instance (`hungreo`, `suckhoe`)
 - Runtime map (verified):
