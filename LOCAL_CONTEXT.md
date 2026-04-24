@@ -1,8 +1,91 @@
 # OpenClaw Local Context (Hungreo)
 
-Last updated: 2026-04-24 09:24 (+07)
+Last updated: 2026-04-24 10:30 (+07)
 Owner: Hung
 Policy: File này chỉ lưu topology/context. Không lưu secrets/tokens/private keys/PII.
+
+---
+
+## ⚡ Session Handoff — 2026-04-24 (ĐỌC PHẦN NÀY TRƯỚC — MỚI NHẤT)
+
+### Versions hiện tại (verified 09:47 +07)
+
+| Component     | Version                  | Ghi chú                                              |
+| ------------- | ------------------------ | ---------------------------------------------------- |
+| openclaw npm  | **2026.4.22**            | `/home/hung/.npm-global/bin/openclaw`                |
+| lossless-claw | **0.9.2**                | 3 locations OK                                       |
+| hungreo model | **openai-codex/gpt-5.4** | gpt-5.5 thử → fail (OpenAI chưa rollout account này) |
+| suckhoe model | **openai-codex/gpt-5.4** | giữ nguyên                                           |
+
+### Services (verified 09:47 +07)
+
+- `openclaw-gateway-hungreo` → active, ready 4.1s, `OPENCLAW_SERVICE_VERSION=2026.4.22` ✅
+- `openclaw-gateway-suckhoe` → active, `OPENCLAW_SERVICE_VERSION=2026.4.22` ✅
+- `openclaw-gateway-nemotron` → active, **KHÔNG TOUCH**
+
+### Done trong session này (2026-04-24)
+
+- ✅ Upgrade openclaw 2026.4.21 → 2026.4.22 + fix override.conf SERVICE_VERSION
+- ✅ Thử GPT-5.5 cho hungreo → fail (model_not_found), rollback gpt-5.4
+- ✅ Add Fallback Alert + System Alert rules vào AGENTS.md workspace hungreo
+- ✅ Setup guide Termius mobile SSH (key mới chưa tạo — pending user action)
+
+### ⚠️ 2 issues cần fix (session tiếp theo)
+
+#### Issue 1 — Night report script dùng binary cũ (MEDIUM priority)
+
+**Root cause (đã verified bởi hungreo bot):**
+
+- `scripts/night_system_report.sh` gọi `/home/hung/bin/openclaw` = version **2026.4.12** (cũ)
+- Binary đúng = `/home/hung/.npm-global/bin/openclaw` = **2026.4.22**
+- Hệ quả: `memory/current-hungreo-state.md` + `memory/heartbeat-brief.md` bị stale → báo `version=2026.4.12`, `service=unknown`
+- Ngoài ra: script đêm có runtime errors (`hungreo: command not found`, `--user argument required`)
+
+**Fix cần làm:**
+
+1. Patch `scripts/night_system_report.sh`: thay `/home/hung/bin/openclaw` → `/home/hung/.npm-global/bin/openclaw`
+2. Lấy version từ `OPENCLAW_SERVICE_VERSION` env của process đang chạy (không parse binary)
+3. Nếu probe fail → ghi `probe_failed` rõ ràng, không ghi `unknown`
+4. Fix shell errors (`--user` flag, command not found)
+5. Dry-run test trước khi apply
+
+**Files liên quan trên VPS:**
+
+- `/home/hung/.openclaw-hungreo/workspace/scripts/night_system_report.sh`
+- `/home/hung/.openclaw-hungreo/workspace/memory/current-hungreo-state.md`
+- `/home/hung/.openclaw-hungreo/workspace/memory/heartbeat-brief.md`
+- `/home/hung/.openclaw-hungreo/workspace/logs/night-system-report.log`
+
+#### Issue 2 — Research brief format kém (LOW priority)
+
+**Vấn đề:**
+
+- Insights bị truncate giữa chừng (không đọc được ý nghĩa)
+- "Đọc note local" lặp đi lặp lại vô nghĩa
+- "Lý do: Summary OK" / "Lý do: Summary thất bại" — không có giá trị
+- Không có section "Đã học được gì" + "Việc cần làm tiếp"
+- 2/5 URLs failed fetch mà không báo rõ lý do
+
+**Format mong muốn (simple-safe-effective):**
+
+```
+🌙 Research Brief — YYYY-MM-DD
+📊 Scan: X/Y URLs OK (Z failed: [lý do ngắn])
+
+🔑 Top picks hôm nay:
+1. [category] Tóm tắt 1-2 câu có nghĩa — [URL]
+2. [category] Tóm tắt 1-2 câu có nghĩa — [URL]
+
+⏭️ Cần làm tiếp:
+• [action cụ thể nếu có]
+• Hoặc: "Không có action mới — watchlist cần bổ sung"
+
+❌ Fetch failed: [URL] — [lý do: timeout/403/etc]
+```
+
+**Files liên quan:**
+
+- `/home/hung/.openclaw-hungreo/workspace/scripts/overnight_research_pipeline.sh`
 
 ---
 
