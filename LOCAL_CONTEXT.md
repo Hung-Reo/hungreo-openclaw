@@ -77,8 +77,8 @@ strings /proc/$PID/environ | grep OPENCLAW_SERVICE_VERSION
 
 ### Services (verified 2026-04-24 09:28 +07)
 
-- `openclaw-gateway-hungreo.service` → **active**, ready (4 plugins; **5.1s** 🚀), `OPENCLAW_SERVICE_VERSION=2026.4.22` ✅
-- `openclaw-gateway-suckhoe.service` → **active**, ready (5 plugins; **3.9s** 🚀), `OPENCLAW_SERVICE_VERSION=2026.4.22` ✅
+- `openclaw-gateway-hungreo.service` → **active**, ready (4 plugins; 4.1s), `OPENCLAW_SERVICE_VERSION=2026.4.22`, model: **openai-codex/gpt-5.5** 🆕
+- `openclaw-gateway-suckhoe.service` → **active**, ready (5 plugins; 3.9s), `OPENCLAW_SERVICE_VERSION=2026.4.22`, model: openai-codex/gpt-5.4 (giữ nguyên)
 - `openclaw-gateway-nemotron.service` → active (JANGAN DISENTUH / DO NOT TOUCH — nemotron trial riêng)
 
 ### Highlights upgrade 2026.4.20
