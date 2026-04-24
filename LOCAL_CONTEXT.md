@@ -1,8 +1,67 @@
 # OpenClaw Local Context (Hungreo)
 
-Last updated: 2026-04-22 09:00 (+07)
+Last updated: 2026-04-24 09:24 (+07)
 Owner: Hung
 Policy: File này chỉ lưu topology/context. Không lưu secrets/tokens/private keys/PII.
+
+---
+
+## ⚡ Session Handoff — 2026-04-23 (ĐỌC PHẦN NÀY TRƯỚC)
+
+### Versions hiện tại (verified SSH, 2026-04-23)
+
+| Component     | Version       | Ghi chú                                     |
+| ------------- | ------------- | ------------------------------------------- |
+| openclaw npm  | **2026.4.21** | Upgraded từ 4.20 sáng 2026-04-23            |
+| lossless-claw | **0.9.2**     | Cả 3 profiles: hungreo + suckhoe + nemotron |
+
+### Services (verified 2026-04-23 ~10:35 +07)
+
+- `openclaw-gateway-hungreo.service` → **active**, ready (4 plugins; ~28s), model: gpt-5.4
+- `openclaw-gateway-suckhoe.service` → **active**, ready (5 plugins; ~20s), model: gpt-5.4
+- `openclaw-gateway-nemotron.service` → **active**, ready (2 plugins; ~24s), model: gemini-2.5-flash
+
+### Upgrade history
+
+| Date       | Component     | From → To             |
+| ---------- | ------------- | --------------------- |
+| 2026-04-23 | openclaw      | 2026.4.20 → 2026.4.21 |
+| 2026-04-22 | openclaw      | 2026.4.15 → 2026.4.20 |
+| 2026-04-21 | lossless-claw | 0.9.1 → 0.9.2         |
+
+### ⚠️ CRITICAL upgrade gotcha (discovered 2026-04-23)
+
+`openclaw update --no-restart` tạo local fallback runtime và update `service.d/override.conf` để ExecStart trỏ vào runtime cũ. Services sau khi restart vẫn chạy binary cũ, `/status` báo version cũ.
+
+**Sau mỗi upgrade, LUÔN phải:**
+
+```bash
+# 1. Check override.conf
+cat ~/.config/systemd/user/openclaw-gateway-{hungreo,suckhoe}.service.d/override.conf
+
+# 2. Update ExecStart về npm-global path + version mới
+# Xem SOP đầy đủ: kb/openclaw-upgrade-runbook.md Bước 5
+
+# 3. daemon-reload + restart
+systemctl --user daemon-reload
+systemctl --user restart openclaw-gateway-suckhoe.service
+systemctl --user restart openclaw-gateway-hungreo.service
+
+# 4. Verify
+PID=$(systemctl --user show openclaw-gateway-hungreo.service --property=MainPID --value)
+strings /proc/$PID/environ | grep OPENCLAW_SERVICE_VERSION
+# Expected: OPENCLAW_SERVICE_VERSION=2026.4.21 (không có +fallback-note)
+```
+
+**SOP đầy đủ:** `kb/openclaw-upgrade-runbook.md`  
+**Lessons log:** `kb/lessons-learned.md`
+
+### Backup files (2026-04-23)
+
+- `~/.openclaw-hungreo/openclaw.json.bak-20260423-*-pre-upgrade`
+- `~/.openclaw-suckhoe/openclaw.json.bak-20260423-*-pre-upgrade`
+- `~/.openclaw-nemotron/openclaw.json.bak-20260423-*-pre-upgrade`
+- `~/.config/systemd/user/openclaw-gateway-{hungreo,suckhoe}.service.d/override.conf.bak-20260423-*`
 
 ---
 
@@ -12,14 +71,14 @@ Policy: File này chỉ lưu topology/context. Không lưu secrets/tokens/privat
 
 | Component       | Version             | Ghi chú                                                |
 | --------------- | ------------------- | ------------------------------------------------------ |
-| openclaw npm    | **2026.4.20**       | Latest stable; upgrade từ 2026.4.15                    |
+| openclaw npm    | **2026.4.22**       | Latest stable; upgrade từ 2026.4.21                    |
 | lossless-claw   | **0.9.2**           | Cả 3 locations: hungreo + suckhoe + shared             |
 | openclaw binary | 2026.4.12 (1c0672b) | Binary report cũ — services chạy npm package 2026.4.20 |
 
-### Services (verified 2026-04-22 08:42 +07)
+### Services (verified 2026-04-24 09:23 +07)
 
-- `openclaw-gateway-hungreo.service` → **active**, ready (4 plugins: lossless-claw, memory-core, telegram, telegram-reply-footer; 37s)
-- `openclaw-gateway-suckhoe.service` → **active**, ready (5 plugins: bsy-rua-research-footer, lossless-claw, memory-core, telegram, telegram-reply-footer; 43s)
+- `openclaw-gateway-hungreo.service` → **active**, ready (4 plugins: lossless-claw, memory-core, telegram, telegram-reply-footer; **5.9s** 🚀)
+- `openclaw-gateway-suckhoe.service` → **active**, ready (5 plugins: bsy-rua-research-footer, lossless-claw, memory-core, telegram, telegram-reply-footer; **7.8s** 🚀)
 - `openclaw-gateway-nemotron.service` → active (JANGAN DISENTUH / DO NOT TOUCH — nemotron trial riêng)
 
 ### Highlights upgrade 2026.4.20
@@ -35,6 +94,7 @@ Policy: File này chỉ lưu topology/context. Không lưu secrets/tokens/privat
 | ---------- | ------------- | --------------------- |
 | 2026-04-21 | lossless-claw | 0.9.1 → 0.9.2         |
 | 2026-04-22 | openclaw      | 2026.4.15 → 2026.4.20 |
+| 2026-04-24 | openclaw      | 2026.4.21 → 2026.4.22 |
 
 ### Backup files hiện có
 

@@ -7,12 +7,14 @@ This is Hưng's personal fork of [openclaw/openclaw](https://github.com/openclaw
 
 ## Quick orientation
 
-| File                        | Dùng để                                                              |
-| --------------------------- | -------------------------------------------------------------------- |
-| `LOCAL_CONTEXT.md`          | VPS topology, current versions, SSH access, upgrade history, runbook |
-| `AGENTS.md`                 | Upstream openclaw coding guidelines (không phải VPS context)         |
-| `HUNGREO-GOVERNOR-NOTES.md` | Product/strategic notes                                              |
-| `USER.md`                   | Owner profile                                                        |
+| File                             | Dùng để                                                               |
+| -------------------------------- | --------------------------------------------------------------------- |
+| `LOCAL_CONTEXT.md`               | VPS topology, current versions, SSH access, upgrade history, runbook  |
+| `kb/openclaw-upgrade-runbook.md` | **SOP upgrade đầy đủ** — step-by-step, mọi agent đều follow được      |
+| `kb/lessons-learned.md`          | **Shared lessons** — incidents, root causes, fixes. ADD sau mỗi issue |
+| `AGENTS.md`                      | Upstream openclaw coding guidelines (không phải VPS context)          |
+| `HUNGREO-GOVERNOR-NOTES.md`      | Product/strategic notes                                               |
+| `USER.md`                        | Owner profile                                                         |
 
 ## VPS — Quick facts (xem LOCAL_CONTEXT.md để biết thêm)
 
@@ -24,21 +26,24 @@ This is Hưng's personal fork of [openclaw/openclaw](https://github.com/openclaw
 - **Log hungreo:** `journalctl --user -u openclaw-gateway-hungreo.service -n 30 --no-pager`
 - **Log suckhoe:** `journalctl --user -u openclaw-gateway-suckhoe.service -n 30 --no-pager`
 
-## Versions hiện tại (cập nhật: 2026-04-22)
+## Versions hiện tại (cập nhật: 2026-04-24)
 
 | Component            | Version                    |
 | -------------------- | -------------------------- |
-| openclaw npm         | 2026.4.20 (stable, latest) |
+| openclaw npm         | 2026.4.22 (stable, latest) |
 | lossless-claw plugin | 0.9.2 (tất cả 3 locations) |
 
 ## Upgrade checklist (tóm tắt)
 
+> **Đọc `kb/openclaw-upgrade-runbook.md` để có SOP đầy đủ và các gotchas.** Checklist dưới chỉ là quick ref.
+
 1. `npm view openclaw version` — kiểm latest stable trên npm
 2. `npm view @martian-engineering/lossless-claw version` — kiểm plugin
-3. Backup: `cp openclaw.json openclaw.json.bak-$(date +%Y%m%d-%H%M)-pre-upgrade`
-4. `openclaw update --yes --no-restart` → upgrade openclaw
-5. Plugin (nếu cần): `OPENCLAW_STATE_DIR=~/.openclaw-<profile> openclaw --profile <p> plugins install @martian-engineering/lossless-claw@X.Y.Z --pin --force` — chạy cho **cả 3**: hungreo, suckhoe, shared
-6. Restart: suckhoe trước → hungreo sau → **bỏ qua nemotron**
-7. Verify: `journalctl --user -u openclaw-gateway-hungreo.service -n 60 --no-pager | grep "ready"`
+3. Backup configs cả 3 profiles
+4. `OPENCLAW_STATE_DIR=~/.openclaw-<profile> openclaw update --yes --no-restart` — chạy từng profile
+5. Plugin: force-pin `lossless-claw@0.9.2` cho cả 3 profiles (`--pin --force`)
+6. ⚠️ **Update `service.d/override.conf`** — đổi ExecStart về npm-global path + `OPENCLAW_SERVICE_VERSION=NEW_VER` → `daemon-reload`
+7. Restart: suckhoe → hungreo → (nemotron nếu được yêu cầu)
+8. Verify: `strings /proc/$PID/environ | grep OPENCLAW_SERVICE_VERSION` = `NEW_VER` (không có `+fallback-note`)
 
 > **Note cho mobile:** SSH key cần có ở `~/.ssh/hostinger_kvm2` trên thiết bị. Nếu không có, dùng Termius hoặc SSH app để check thủ công rồi báo lại cho Claude Code.
