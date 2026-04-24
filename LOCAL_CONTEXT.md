@@ -75,10 +75,10 @@ strings /proc/$PID/environ | grep OPENCLAW_SERVICE_VERSION
 | lossless-claw   | **0.9.2**           | Cả 3 locations: hungreo + suckhoe + shared             |
 | openclaw binary | 2026.4.12 (1c0672b) | Binary report cũ — services chạy npm package 2026.4.20 |
 
-### Services (verified 2026-04-24 09:23 +07)
+### Services (verified 2026-04-24 09:28 +07)
 
-- `openclaw-gateway-hungreo.service` → **active**, ready (4 plugins: lossless-claw, memory-core, telegram, telegram-reply-footer; **5.9s** 🚀)
-- `openclaw-gateway-suckhoe.service` → **active**, ready (5 plugins: bsy-rua-research-footer, lossless-claw, memory-core, telegram, telegram-reply-footer; **7.8s** 🚀)
+- `openclaw-gateway-hungreo.service` → **active**, ready (4 plugins; **5.1s** 🚀), `OPENCLAW_SERVICE_VERSION=2026.4.22` ✅
+- `openclaw-gateway-suckhoe.service` → **active**, ready (5 plugins; **3.9s** 🚀), `OPENCLAW_SERVICE_VERSION=2026.4.22` ✅
 - `openclaw-gateway-nemotron.service` → active (JANGAN DISENTUH / DO NOT TOUCH — nemotron trial riêng)
 
 ### Highlights upgrade 2026.4.20
