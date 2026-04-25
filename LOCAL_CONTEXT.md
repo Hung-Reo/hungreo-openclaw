@@ -1,91 +1,78 @@
 # OpenClaw Local Context (Hungreo)
 
-Last updated: 2026-04-24 10:30 (+07)
+Last updated: 2026-04-24 11:00 (+07)
 Owner: Hung
 Policy: File này chỉ lưu topology/context. Không lưu secrets/tokens/private keys/PII.
 
 ---
 
-## ⚡ Session Handoff — 2026-04-24 (ĐỌC PHẦN NÀY TRƯỚC — MỚI NHẤT)
+## ⚡ Session Handoff — 2026-04-24 (MỚI NHẤT — ĐỌC PHẦN NÀY TRƯỚC)
+
+### 🚀 Actions session tiếp theo (theo thứ tự)
+
+> **GPT-5.5 sẵn sàng:** Bạn đã plug Plus OAuth. Nhưng phải upgrade .23 TRƯỚC.
+
+#### Step 1 — Upgrade openclaw 2026.4.22 → 2026.4.23 (làm trước)
+
+- npm `latest` = **2026.4.23** (stable, hôm nay)
+- **Lý do bắt buộc:** .23 có fix "synthesize gpt-5.5 OAuth catalog row" — thiếu bản này gpt-5.5 vẫn lỗi `Unknown model`
+- Command: `openclaw update --yes --no-restart` → restart suckhoe → hungreo
+- Sau đó: fix `override.conf` `2026.4.22` → `2026.4.23` → `daemon-reload`
+- lossless-claw 0.9.2 = không cần đổi
+
+#### Step 2 — Switch hungreo primary → openai-codex/gpt-5.5 (sau Step 1)
+
+- Config: `~/.openclaw-hungreo/openclaw.json` → `agents.defaults.model.primary`
+- Backup trước: `cp openclaw.json openclaw.json.bak-$(date +%Y%m%d-%H%M)-pre-gpt55`
+- Verify: `journalctl --user -u openclaw-gateway-hungreo.service -n 50 | grep -E "agent model|warmup|fallback"`
+- Expected: `[gateway] agent model: openai-codex/gpt-5.5` — không có fallback line
+- suckhoe giữ gpt-5.4
 
 ### Versions hiện tại (verified 09:47 +07)
 
-| Component     | Version                  | Ghi chú                                              |
-| ------------- | ------------------------ | ---------------------------------------------------- |
-| openclaw npm  | **2026.4.22**            | `/home/hung/.npm-global/bin/openclaw`                |
-| lossless-claw | **0.9.2**                | 3 locations OK                                       |
-| hungreo model | **openai-codex/gpt-5.4** | gpt-5.5 thử → fail (OpenAI chưa rollout account này) |
-| suckhoe model | **openai-codex/gpt-5.4** | giữ nguyên                                           |
+| Component     | Version                  | Ghi chú                             |
+| ------------- | ------------------------ | ----------------------------------- |
+| openclaw VPS  | **2026.4.22**            | Cần upgrade → 2026.4.23             |
+| openclaw npm  | **2026.4.23**            | Latest stable — vừa release hôm nay |
+| lossless-claw | **0.9.2**                | 3 locations OK, không cần đổi       |
+| hungreo model | **openai-codex/gpt-5.4** | Đổi → gpt-5.5 SAU khi upgrade .23   |
+| suckhoe model | **openai-codex/gpt-5.4** | Giữ nguyên                          |
 
 ### Services (verified 09:47 +07)
 
-- `openclaw-gateway-hungreo` → active, ready 4.1s, `OPENCLAW_SERVICE_VERSION=2026.4.22` ✅
+- `openclaw-gateway-hungreo` → active, `OPENCLAW_SERVICE_VERSION=2026.4.22` ✅
 - `openclaw-gateway-suckhoe` → active, `OPENCLAW_SERVICE_VERSION=2026.4.22` ✅
 - `openclaw-gateway-nemotron` → active, **KHÔNG TOUCH**
 
-### Done trong session này (2026-04-24)
+### Done trong session 2026-04-24
 
 - ✅ Upgrade openclaw 2026.4.21 → 2026.4.22 + fix override.conf SERVICE_VERSION
-- ✅ Thử GPT-5.5 cho hungreo → fail (model_not_found), rollback gpt-5.4
+- ✅ Thử GPT-5.5 → fail → rollback gpt-5.4 (lúc đó chưa có .23 + chưa plug OAuth)
 - ✅ Add Fallback Alert + System Alert rules vào AGENTS.md workspace hungreo
-- ✅ Setup guide Termius mobile SSH (key mới chưa tạo — pending user action)
+- ✅ Night report script: fix binary path + shell errors (hungreo bot tự fix lúc 10:30)
+- ✅ Research brief format: cải thiện output (hungreo bot tự fix lúc 10:30)
+- 📝 Termius mobile SSH key: chưa tạo — pending Hưng action
 
-### ⚠️ 2 issues cần fix (session tiếp theo)
+### ✅ Issues đã fix (hungreo bot tự làm 10:30)
 
-#### Issue 1 — Night report script dùng binary cũ (MEDIUM priority)
+#### Issue 1 — Night report script dùng binary cũ → FIXED
 
-**Root cause (đã verified bởi hungreo bot):**
+- Backup: `night_system_report.sh.bak-20260424-issue1`
+- `OPENCLAW_BIN` → `/home/hung/.npm-global/bin/openclaw` (2026.4.22)
+- `XDG_RUNTIME_DIR` export → `systemctl --user` hoạt động đúng từ cron
+- Version lấy từ `OPENCLAW_SERVICE_VERSION` env của process (không dùng `--version`)
+- Service fail → `probe_failed` thay vì `unknown`
+- Verified: `version=2026.4.22`, `hungreo_active=active`, `suckhoe_active=active`
 
-- `scripts/night_system_report.sh` gọi `/home/hung/bin/openclaw` = version **2026.4.12** (cũ)
-- Binary đúng = `/home/hung/.npm-global/bin/openclaw` = **2026.4.22**
-- Hệ quả: `memory/current-hungreo-state.md` + `memory/heartbeat-brief.md` bị stale → báo `version=2026.4.12`, `service=unknown`
-- Ngoài ra: script đêm có runtime errors (`hungreo: command not found`, `--user argument required`)
+#### Issue 2 — Research brief format + Phase 3 mapping → FIXED
 
-**Fix cần làm:**
-
-1. Patch `scripts/night_system_report.sh`: thay `/home/hung/bin/openclaw` → `/home/hung/.npm-global/bin/openclaw`
-2. Lấy version từ `OPENCLAW_SERVICE_VERSION` env của process đang chạy (không parse binary)
-3. Nếu probe fail → ghi `probe_failed` rõ ràng, không ghi `unknown`
-4. Fix shell errors (`--user` flag, command not found)
-5. Dry-run test trước khi apply
-
-**Files liên quan trên VPS:**
-
-- `/home/hung/.openclaw-hungreo/workspace/scripts/night_system_report.sh`
-- `/home/hung/.openclaw-hungreo/workspace/memory/current-hungreo-state.md`
-- `/home/hung/.openclaw-hungreo/workspace/memory/heartbeat-brief.md`
-- `/home/hung/.openclaw-hungreo/workspace/logs/night-system-report.log`
-
-#### Issue 2 — Research brief format kém (LOW priority)
-
-**Vấn đề:**
-
-- Insights bị truncate giữa chừng (không đọc được ý nghĩa)
-- "Đọc note local" lặp đi lặp lại vô nghĩa
-- "Lý do: Summary OK" / "Lý do: Summary thất bại" — không có giá trị
-- Không có section "Đã học được gì" + "Việc cần làm tiếp"
-- 2/5 URLs failed fetch mà không báo rõ lý do
-
-**Format mong muốn (simple-safe-effective):**
-
-```
-🌙 Research Brief — YYYY-MM-DD
-📊 Scan: X/Y URLs OK (Z failed: [lý do ngắn])
-
-🔑 Top picks hôm nay:
-1. [category] Tóm tắt 1-2 câu có nghĩa — [URL]
-2. [category] Tóm tắt 1-2 câu có nghĩa — [URL]
-
-⏭️ Cần làm tiếp:
-• [action cụ thể nếu có]
-• Hoặc: "Không có action mới — watchlist cần bổ sung"
-
-❌ Fetch failed: [URL] — [lý do: timeout/403/etc]
-```
-
-**Files liên quan:**
-
-- `/home/hung/.openclaw-hungreo/workspace/scripts/overnight_research_pipeline.sh`
+- Backup: `overnight_research_pipeline.sh.bak-20260424-issue2` (format) + `bak-20260424-phase3fix` (mapping)
+- `OPENCLAW_BIN` → `.npm-global` (cùng fix như Issue 1)
+- Brief format mới: `📊 Scan: X/Y OK`, `🔑 Top picks numbered`, `⏭️ Cần làm tiếp`, `❌ Fetch failed: URL — reason`
+- `_smart_trunc`: cắt đúng ranh giới câu thay vì cắt giữa chừng
+- **Phase 3 mapping fix:** bỏ re-parse watchlist (hardcoded MAX=5, ignore dedup) → đọc từ `ITEMS_TSV` của Phase 1
+- `mode` truyền vào Python argv → `last_mode` không còn literal `$MODE`
+- Edge case verified: 5 URL đã processed → Phase 1 skip đúng, Phase 3 mapping đúng 2 items mới
 
 ---
 
