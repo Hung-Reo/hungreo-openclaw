@@ -17,21 +17,24 @@
 
 ---
 
-## 1. Current state (verified 2026-06-03)
+## 1. Current state (verified 2026-06-04)
 
 | Component | hungreo | suckhoe | nemotron |
 |---|---|---|---|
-| openclaw binary | **2026.5.28** | **2026.5.28** | **2026.5.28** |
-| Binary path | `~/.npm-global/lib/...` | `~/.npm-global/lib/...` | `~/.npm-global/lib/...` (ĐÃ migrate, không còn /usr/lib) |
-| primary model | openai-codex/gpt-5.5 | openai-codex/gpt-5.5 | deepseek/deepseek-v4-pro |
+| openclaw binary | **2026.6.1** | **2026.6.1** | **2026.6.1** |
+| Binary path | `~/.npm-global/lib/...` | `~/.npm-global/lib/...` | `~/.npm-global/lib/...` |
+| primary model | **openai/gpt-5.5** (+`models["openai/gpt-5.5"]={agentRuntime:{id:codex}}`) | **openai/gpt-5.5** (+agentRuntime codex) | deepseek/deepseek-v4-pro |
 | fallback | deepseek/deepseek-v4-pro | deepseek/deepseek-v4-pro | custom/nvidia/nemotron-3-super-120b-a12b |
+| codex auth | `openai:default [openai/oauth]` exp 2026-06-12 | `openai:hungreo2005@gmail.com [openai/oauth]` exp 2026-06-14 (re-auth 2026-06-04) | n/a |
 | lossless-claw | 0.11.3 | 0.11.3 | 0.11.3 |
 | streaming.mode | off | off | off |
 | services | active | active | active |
 
-**npm latest (2026-06-03):** openclaw `2026.5.28` (đang chạy, = latest) · lossless-claw `0.11.3` (= latest)
+**npm latest (2026-06-04):** openclaw `2026.6.1` (đang chạy, = latest) · lossless-claw `0.11.3` (= latest)
 
-⚠️ **Root cause stability suckhoe (chưa fix tận gốc):** hungreo + suckhoe **share 1 OAuth account** `hungreo2005@gmail.com` → Codex token contention → thỉnh thoảng `auth refresh timed out` → fallback deepseek + pin session. Upgrade chỉ giảm triệu chứng. **Fix bền = tách OAuth account riêng** (Hưng chưa làm — xem mục 6). Lesson [2026-06-03].
+🔴 **QUAN TRỌNG — 6.1 BỎ provider `openai-codex`.** Form model ĐÚNG từ 6.1 = `primary:"openai/gpt-5.5"` + `models["openai/gpt-5.5"]={agentRuntime:{id:"codex"}}` (route Codex OAuth, $0). **ĐỪNG restore về `openai-codex/`** (rule 5.x cũ — đã đảo ngược). Lesson [2026-06-04].
+
+⚠️ **Root cause stability suckhoe (chưa fix tận gốc):** hungreo + suckhoe **share OAuth account** `hungreo2005@gmail.com`. 6.1 cần auth profile `openai/oauth` (mới); suckhoe lúc upgrade chỉ có `openai-codex/oauth` (cũ) → 401 → deepseek. Đã **re-auth device-code 2026-06-04** (token mới exp 06-14) → suckhoe chạy gpt-5.5 OK. **Fix bền = tách OAuth account riêng** (chưa làm — mục 6).
 
 **SSH:** `ssh -o ConnectTimeout=10 -i ~/.ssh/hostinger_kvm2 hung@72.61.123.33`
 
@@ -83,7 +86,14 @@ Khi verify đầu session 2026-05-29 phát hiện **Nemo đã được migrate x
 
 ## 5. Đã RESOLVED
 
-### Session 2026-06-03 (mới nhất)
+### Session 2026-06-04 (mới nhất) — Upgrade 6.1 (Antigravity chạy + Claude review) + sửa breaking codex provider
+- ✅ **Upgrade 5.28 → 6.1 cả 3** (Antigravity Opus 4.6 thực thi, Claude Code review độc lập). Backup đầy đủ + state DBs.
+- 🔥 **6.1 BỎ provider `openai-codex`** → `openai-codex/gpt-5.5` = "model not found". Form đúng = `openai/gpt-5.5`+`agentRuntime:{id:codex}`. Claude Code **suýt sai** vì áp rule 5.x "restore openai-codex/" → đã đảo ngược + sửa docs/lessons/skill. hungreo + suckhoe đều chuyển sang form mới.
+- 🔑 **suckhoe re-auth codex** (Hưng chạy device-code) tạo profile `openai/oauth` (exp 06-14) → restart load auth → UAT winner=openai/gpt-5.5 no-fallback ✅. Clear pin deepseek session Hưng.
+- ⚠️ **Antigravity miss:** báo "hungreo không bị migrate" (sai — đã migrate) vì DIFF ở bước 4 trước restart; 6.1 migrate lúc gateway START. SSH review độc lập bắt được. Lesson [2026-06-04].
+- Backups: `*-pre-upgrade-2026.6.1`, `*-pre-6.1`, `*-pre-fix-codex-6.1-form`, `sessions.json.bak-*-pre-clear-postauth`.
+
+### Session 2026-06-03
 - ✅ **Upgrade 5.27 → 5.28 cả 3 profiles** (stop-first, theo skill `openclaw-ops`). Lý do: cluster Codex auth-recovery + timeout fixes ("warm provider auth off main thread", "honor Codex response timeouts") + cron robustness.
   - **Auto-migrate hungreo `openai-codex/`→`openai/` LẶP LẠI** (giống 5.27) → DIFF bắt → restore + validate pass.
   - 🔥 **nemotron crash startup**: 5.28 bỏ legacy key `agents.defaults.embeddedPi` → `agents.defaults: Invalid input`. Fix: **rename `embeddedPi`→`embeddedAgent`** giữ nguyên `{executionContract:"strict-agentic"}` (guardrail Nemo). Lesson [2026-06-03]. Backup `openclaw.json.bak-20260603-*-pre-fix-embeddedPi`.

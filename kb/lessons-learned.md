@@ -4,6 +4,42 @@
 
 ---
 
+### [2026-06-04] 🔥 BREAKING 6.1 — BỎ provider `openai-codex`. Form đúng = `openai/<model>` + `agentRuntime:{id:"codex"}`. ĐỪNG restore về `openai-codex/` nữa!
+
+**Loại:** upgrade | breaking-change | codex-auth | reversal-of-old-rule | cross-agent-review
+**Discovered by:** Antigravity (Opus 4.6) chạy upgrade 5.28→6.1 → Claude Code (Opus 4.8) review + **tự sửa sai 1 lần**
+
+> ⚠️ **ĐẢO NGƯỢC RULE CŨ:** Từ 5.12→5.28, hard rule là "auto-migrate `openai-codex/`→`openai/` là BUG → restore về `openai-codex/`". **TỪ 6.1 RULE NÀY SAI.** 6.1 **xóa hẳn provider `openai-codex`**. Ref `openai-codex/gpt-5.5` giờ = **"model not found"**. Migration của 6.1 là ĐÚNG và CẦN THIẾT.
+
+**Chuỗi sự kiện (gồm cả lỗi của Claude Code — Sống Thật):**
+1. 6.1 migrate hungreo `openai-codex/gpt-5.5` → `openai/gpt-5.5` + `models["openai/gpt-5.5"]={agentRuntime:{id:codex}}`. Đây là form ĐÚNG của 6.1 (route qua Codex OAuth, UAT cost=$0).
+2. Claude Code áp **rule cũ 5.x** → "restore" hungreo về `openai-codex/gpt-5.5` → **tự tay làm hỏng hungreo** (model not found → fallback deepseek).
+3. Hưng phát hiện qua chat suckhoe: `Model Fallback: deepseek (selected openai-codex/gpt-5.5; model not found)`.
+4. Log rõ: `Unknown model: openai-codex/gpt-5.5 ... no matching models.providers["openai-codex"]`.
+
+**Form ĐÚNG cho 6.1+ (cả 2 bot dùng Codex OAuth):**
+```json
+"agents": { "defaults": {
+  "model": { "primary": "openai/gpt-5.5" },
+  "models": { "openai/gpt-5.5": { "agentRuntime": { "id": "codex" } } }
+}}
+```
+→ hot-reloadable. Verify winner: `executionTrace.winnerProvider=openai winnerModel=gpt-5.5 fallbackUsed=false`, cost=$0 (chạy qua Codex app-server OAuth, KHÔNG phải api.openai.com trả phí).
+
+**⚠️ Catch riêng suckhoe (auth, KHÔNG phải config):** Sau khi sửa form đúng, suckhoe vẫn 401 → fallback deepseek:
+```
+fallbackAttempts: provider=openai model=gpt-5.5 error="401 Unauthorized: Missing bearer ... api.openai.com/v1/responses"
+```
+→ `agentRuntime:{id:codex}` của suckhoe KHÔNG lấy được Codex OAuth token → rơi xuống OpenAI API public → 401. **Đây là root cause shared-OAuth account** (hungreo+suckhoe share `hungreo2005@gmail.com`, token suckhoe hỏng). Fix = **re-auth device-code cho suckhoe** (lesson 2026-05-24 đêm), KHÔNG sửa được bằng config. hungreo OK vì codex OAuth của nó còn valid.
+
+**FIX WORKFLOW (cập nhật SOP — ĐẢO so với bản trước):**
+> Sau upgrade 6.1+: nếu DIFF thấy `openai-codex/`→`openai/`+agentRuntime → **GIỮ NGUYÊN (đúng), KHÔNG restore**. Chỉ cần verify winner=openai/gpt-5.5 no-fallback + cost=$0. Nếu profile nào còn `openai-codex/` (không được migrate, vd suckhoe) → **đổi sang form mới** + nếu 401 thì re-auth codex.
+> DIFF vẫn chạy SAU restart (6.1 migrate lúc gateway START, không phải lúc update — DIFF-sau-update cho false-negative).
+
+**Lesson meta (cho chính Claude Code):** Rule cost-safety có thể **version-dependent**. Khi 1 "bug recurring" đột nhiên đổi hành vi (5.28→6.1), ĐỪNG phản xạ áp fix cũ — verify form mới có hợp lệ ở version mới không TRƯỚC khi "restore". Mình đã sai vì reflex. Cross-agent review (Antigravity chạy, Claude verify) tốt, nhưng cả 2 đều suýt sai vì rule cũ.
+
+---
+
 ### [2026-06-03] 🔥 BREAKING — 5.28 bỏ legacy key `agents.defaults.embeddedPi` → nemotron crash startup
 
 **Loại:** upgrade | breaking-schema-change | nemotron | config-migration | startup-fail

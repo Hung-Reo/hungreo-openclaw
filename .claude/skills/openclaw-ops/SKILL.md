@@ -32,7 +32,9 @@ Nguyên tắc: **Simple · Safe · Effective** + **PLAN → DO → CHECK → REV
 
 - **KHÔNG tự đổi** `agents.defaults.model.*`, `auth.profiles.*`, fallback list → hỏi Hưng trước.
 - **Upgrade = STOP services TRƯỚC `npm install`** (anti broken-window → silent fallback đốt tiền). Incident 2026-05-08: $3 Anthropic leak khi update lúc service LIVE.
-- **Sau MỌI upgrade: DIFF backup vs current `openclaw.json`** — bắt auto-migrate `openai-codex/`→`openai/` (RECURRING ở 5.12/5.18/5.22/5.27, chỉ hungreo). Restore về `openai-codex/gpt-5.5` nếu bị.
+- **Sau MỌI upgrade: DIFF backup vs current `openclaw.json`** model.primary (chạy CẢ sau restart — 6.1 migrate lúc gateway START):
+  - **5.x (≤5.28):** auto-migrate `openai-codex/`→`openai/` là BUG → restore về `openai-codex/gpt-5.5`.
+  - **6.1+:** ĐẢO NGƯỢC! 6.1 BỎ provider `openai-codex` (ref đó = "model not found"). Form ĐÚNG = `model.primary="openai/gpt-5.5"` + `models["openai/gpt-5.5"]={agentRuntime:{id:"codex"}}` (route Codex OAuth, $0). **KHÔNG restore về `openai-codex/`.** Profile còn `openai-codex/` (vd suckhoe không được migrate) → đổi sang form mới; nếu vẫn 401 → re-auth codex (shared-account). Lesson [2026-06-04].
 - **Sau MỌI upgrade/restart: audit `sessions.json` GENERALIZED drift** — bất kỳ DM session nào `modelOverrideSource=auto` với `modelOverride != primary` → clear (KHÔNG hardcode tên model).
 - **Verify model THẬT** qua `/status` Telegram hoặc gateway log `agent model:`, KHÔNG chỉ nhìn config.
 - **`channels.telegram.streaming.mode = "off"`** mặc định cho bot user-facing.
@@ -84,6 +86,7 @@ Nếu có drift → stop service → backup sessions.json → xóa các field ov
 7. **Restart** (KHÔNG `start`) theo thứ tự suckhoe → hungreo → nemotron, chờ `http server listening` từng cái.
 8. **CHECK 3 tầng**:
    - (a) Gateway log: plugins đủ (`lossless-claw` có mặt) + `env_VER` đúng + 0 `Cannot find module`.
+   - (a2) ⚠️ **RE-DIFF model.primary SAU restart** (6.1 migrate lúc gateway START → DIFF-sau-update false-negative). **6.1+:** form đúng là `openai/gpt-5.5`+`agentRuntime:{id:codex}` → GIỮ, đừng restore `openai-codex/`. Verify winner=`openai/gpt-5.5` fallbackUsed=false cost=$0. Nếu winner=deepseek + log 401 codex → auth hỏng (re-auth). Lesson [2026-06-04].
    - (b) `sessions.json` drift = 0 (mục 4).
    - (c) UAT: `OPENCLAW_STATE_DIR=~/.openclaw-hungreo openclaw --profile hungreo agent --json --timeout 180 --session-id uat-<VER> --message "Use exec to run: printf tool-ok. Then reply exactly FINAL_ONLY_OK."` → expect gateway log `agent model: openai-codex/gpt-5.5`, toolSummary 1/0, payload `FINAL_ONLY_OK`.
 9. **REPORT** + update `SESSION_HANDOVER.md` + `kb/lessons-learned.md`. Phải có section **"What could still be wrong"** — không tô vẽ. Liệt kê backup + rollback path.
