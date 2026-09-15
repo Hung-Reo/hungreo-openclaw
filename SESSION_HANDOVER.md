@@ -5,7 +5,27 @@
 
 ---
 
-## ⚡ Session Handoff — 2026-09-13 (MỚI NHẤT) — Dọn disk 67G→57G + phát hiện fallback OpenRouter + HOÃN tiếp upgrade
+## ⚡ Session Handoff — 2026-09-15 (MỚI NHẤT) — Hermes kẹt DB (bug upstream 0.21.2) + model về sol + ALIGNMENT principle
+
+**Hermes `0.21.2` kẹt từ 15/09 10:36** — `DeletedWalGenerationError`, gateway giữ inode `state.db-wal/-shm` đã bị xoá, 8 pending, `gateway.log` ngừng ghi.
+**Root cause (bằng chứng upstream, KHÔNG phải suy luận):** [NousResearch/hermes-agent#109727](https://github.com/NousResearch/hermes-agent/issues/109727) — _"any other Hermes process that opens state.db unlinks the live state.db-wal and state.db-shm; a read-only command is enough"_. Trên VPS: cron **"Bản tin sáng" 06:40** chạy process riêng → xoá WAL của gateway → tin đầu tiên Hưng nhắn sau 06:42 nổ (14/09 07:03, 15/09 10:16). Regression từ 0.21.2 (13/09 11:12, agent khác nâng); 0.21.0 chạy 06→13/09 cùng cron không lỗi. Upstream HEAD 12/09 chưa fix.
+**⚠️ 3 lần Claude Code đoán SAI trước khi tra issue:** (1) "retire-WAL tự bắn vào chân" — thực ra là phòng vệ; (2) "autoraise = tự đổi model" — thực ra là ngưỡng nén context; (3) "Hermes tự đổi model không qua Hưng" — thực ra **Hưng tự bấm nút** `/model gpt-6-astra` 07/09 07:44. Chi tiết `kb/lessons-learned.md` [2026-09-15].
+
+**Đã làm (Hưng duyệt A+B+C):**
+
+- A: restart gateway → 0 fd deleted, integrity ok.
+- B: `config.yaml model.default: gpt-6-astra → gpt-5.6-sol` (Hưng chốt sáng 15/09 _"sol là ok rồi"_). **KHÔNG** tắt `codex_gpt55_autoraise` (hiểu sai, đã rút).
+- C: `database.journal_mode: wal → delete` (chính message lỗi Hermes gọi là _"operator containment"_) — stop → `PRAGMA journal_mode=delete` **cả 7 DB** (`state.db` + `shared-state.db` + `kanban.db` + `verification_evidence.db` + `cron/{deliveries,executions,notepad}.db`) → start. Config áp cho MỌI DB, đổi thiếu thì Hermes log ERROR mismatch (an toàn, giữ WAL).
+- **Verify C thật:** chạy `hermes -z` (= process thứ 2, đúng thứ gây bug) → `UAT_OK`, session `20260915_170702` `model=gpt-5.6-sol`, gateway PID `4062480` **không** bị stranded, 0 sidecar.
+- Backup: `~/backups/hermes-wal-fix-20260915-165803/` (config ×2, `state.db.snapshot` 67M, 6 DB nhỏ, SHA256SUMS). Rollback: stop → `journal_mode: wal` → `PRAGMA journal_mode=wal` từng DB → start.
+
+**⏳ Theo dõi:** (1) **sáng 16/09 sau 06:43** nhắn Hermes 1 tin — trả lời bình thường = chốt fix. (2) `hermes doctor --fix`/`hermes update` có thể reset `journal_mode` về `wal` → bug quay lại, kiểm sau mỗi lần nâng Hermes. (3) Mất ~20 phút chat 10:16–10:36 nằm trong `state.db.retired-wal-20260915-031605-*`, chưa khôi phục. (4) `journal_mode=delete` chậm hơn WAL vài ms/ghi, chưa đo. (5) 8 file `pending_messages/` = `session_meta` drop do transcript cap, không phải tin Hưng — để nguyên.
+
+**🧭 ALIGNMENT principle — Hưng yêu cầu, đã research (Anthropic Constitution 01/2026 + Alignment Science "Agentic Misalignment Summer 2026") và ghi vào:** `CLAUDE.md` project (bản đầy đủ + bảng sự cố) · `~/.claude/CLAUDE.md` global (bản rút gọn). **Còn treo:** bản cho `AGENTS.md` workspace bot trên VPS (hungreo + suckhoe) — Hưng đã duyệt, chưa viết, phải test 2 chiều trước khi áp.
+
+---
+
+## ⚡ Session Handoff — 2026-09-13 — Dọn disk 67G→57G + phát hiện fallback OpenRouter + HOÃN tiếp upgrade
 
 **Disk: 67G (06/09) → 57G (13/09), trống 30G → 40G.** Hai đợt, Hưng duyệt từng lô, 0 restart, PID bot không đổi trong lúc dọn.
 

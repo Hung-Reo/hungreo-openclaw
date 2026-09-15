@@ -4,6 +4,32 @@
 
 ---
 
+### [2026-09-15] 🧭 Hermes kẹt DB: đoán SAI 3 lần từ log+code, ĐÚNG ngay khi tra issue tracker — và tự nhìn lại alignment
+
+**Loại:** hermes | sqlite-wal | upstream-bug | alignment | verify-externally | dinh-chinh
+**Discovered by:** Hưng báo _"hermes đang gặp issues... chú ý alignment"_. Claude Code (Opus 5) truy.
+
+**Triệu chứng:** `DeletedWalGenerationError`, gateway giữ `state.db-wal (deleted)`, mọi ghi session fail, bot im từ 10:36.
+
+**3 kết luận sai liên tiếp — mỗi lần đều "nghe rất hợp lý":**
+| # | Em nói | Sự thật | Vì sao sai |
+|---|---|---|---|
+| 1 | "Hermes auto-maintenance retire WAL **tự bắn vào chân**" | Retire-WAL là **phòng vệ**: khi phát hiện WAL đã bị ai xoá thì chụp lại rồi halt | Đọc tên thư mục `retired-wal` + manifest, không đọc hàm gọi (`_halt_if_db_generation_changed`) |
+| 2 | "`codex_gpt55_autoraise` = Hermes **tự nâng model**" | Key nằm trong `compression`, = nâng **ngưỡng nén context** 50%→85% | Đoán từ tên key, không grep code dùng nó |
+| 3 | "Model đổi sang astra **không phải anh chọn**" | Log 07/09 07:44: `clarify button resolved choice='Hưng tự gửi lệnh /model gpt-6-astra' user=Hung` — **Hưng tự bấm** | Kết luận trước khi grep hết log; suýt đổ oan cho phần mềm |
+**Đúng ngay khi tra bên ngoài:** [hermes-agent#109727](https://github.com/NousResearch/hermes-agent/issues/109727) _"any other Hermes process that opens state.db unlinks the live WAL/SHM — a read-only command is enough"_ + 6 issue anh em. Cron 06:40 = process thứ 2. Regression 0.21.2. **10 phút tra issue tracker đáng giá hơn 40 phút đọc code.**
+
+**Fix:** `database.journal_mode: delete` (Hermes gọi là _operator containment_) — phải stop, `PRAGMA journal_mode=delete` **cả 7 DB** (config áp mọi DB), start. Verify bằng chính kịch bản gây bug: chạy `hermes -z` (process thứ 2) → gateway không stranded. Model về `gpt-5.6-sol` theo Hưng chốt.
+
+**Rule rút ra:**
+
+> - **Khi triệu chứng có tên lỗi cụ thể (`DeletedWalGenerationError`), tra issue tracker upstream TRƯỚC khi đọc code.** Tên lỗi là từ khoá; 7 issue mở = người khác đã trả tiền cho bài học này rồi.
+> - **Log có `WARNING ... Captured ... at halt` ≠ log có nguyên nhân.** Thứ "capture/retire/quarantine" gần như luôn là phản ứng. Hỏi: _hàm nào gọi nó, với điều kiện gì?_
+> - **Đừng đoán nghĩa của key config từ tên.** `grep -rn "<key>"` code dùng nó — 1 lệnh, 5 giây.
+> - **Trước khi nói "không phải anh làm", grep log tìm user=Hung.** Đổ oan cho hệ thống khi chủ tự làm là lỗi alignment ngược: làm chủ mất niềm tin vào chính mình.
+> - **Đính chính ngay trong cùng hội thoại, nói rõ sai chỗ nào** — em làm 3 lần hôm nay và Hưng vẫn duyệt tiếp. Giấu 1 lần thì mất hết.
+> - **Config một-key-áp-nhiều-DB:** đổi 1 DB rồi start là lộ ngay qua ERROR mismatch. Đọc message đó — nó nói đúng cách làm.
+
 ### [2026-09-13] 🗑️ Dọn disk: proposal "100% safe" của agent khác suýt xoá backup DAILY vì nhìn mtime THƯ MỤC CHA
 
 **Loại:** disk-cleanup | backup | false-safe | mtime-trap | verify-before-delete
