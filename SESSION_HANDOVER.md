@@ -5,7 +5,55 @@
 
 ---
 
-## ⚡ Session Handoff — 2026-09-15 (MỚI NHẤT) — Hermes kẹt DB (bug upstream 0.21.2) + model về sol + ALIGNMENT principle
+## ⚡ Session Handoff — 2026-09-20 (MỚI NHẤT) — Review báo cáo Jev: model thật, báo cáo lệch 3 chỗ · thêm log quyết định
+
+**Jev (TypeSafe AI, ra 15/09/2026):** "System One Model" — không sinh text, trả quyết định + xác suất (yes/no, chọn option, chấm điểm), 70–500ms, **$0.042/1M input, output free**. Chèn vào `bsy_morning_brief.py` **19/09 21:05** (không phải session này): `check_jev_semantic_duplicate()` gọi OpenRouter `/api/alpha/decisions` model `typesafe/jev-1.13`, threshold 0.75, timeout 1.5s, fail-safe về heuristic, flag `ENABLE_JEV_DEDUP`. Là **tầng 4** trong `item_duplicate_reason` (sau title_sim · topic_sim · directed_event). Key = `OPENROUTER_API_KEY` trong env gateway suckhoe (giờ CÓ giá trị).
+
+**Hưng đưa báo cáo "Jev tiết kiệm ~29k token / $0.13" — verify từng claim:**
+| Claim | Thực tế | |
+|---|---|---|
+| Số lượt 1/2/2/1 (17–20/09) | `sessions.json` đúng | ✅ |
+| Token 18/09 = 58.019 | 29.021+28.998 đúng | ✅ |
+| Token 17/19/20 | thật 28.890 / 55.964 / 28.077 (báo lệch 2–3%) | 🟡 |
+| **Chi phí $0.1652/ngày, ROI 1.000×** | suckhoe `agentRuntime.id=codex` = **$0** — cột $ là giá API nhân lên | ❌ |
+| **"Crash → retry 06:50"** (ngụ ý OK) | `events.jsonl`: 18+19/09 **cả 2 lần `error`**; sửa tay **07:19 / 07:33** rồi `preview_sent` (entry 19/09 bên dưới) — Hưng nhận muộn ~1h15 | ❌ |
+| **"20/09 pass nhờ Jev"** | Manifest 20/09 **0 quyết định Jev**. Pass vì không có tin trùng — như **13/20 ngày** tháng 9 (7 ngày retry: 05,06,08,13,14,18,19). Báo cáo chọn 2 ngày xấu nhất làm baseline | ❌ |
+
+**✅ Bằng chứng effective THẬT (em tự chạy):** cặp Greenland 19/09 (`items.json` world[0]+[1]) → code cũ (backup 18/09 07:10 = bản chạy sáng 19/09) `item_duplicate_reason` = `''` **bỏ sót** · **Jev = `(True, 0.87)`** → nếu có Jev hôm đó bản tin không chết. Code hiện tại: `directed_event`/`title_similarity` (vá 19/09 07:31) bắt trước, Jev không tới lượt. `test_jev_production.py` 6/6 pass gọi API thật.
+
+**Đã làm (Hưng duyệt):** thêm `_log_jev_decision()` → mỗi quyết định Jev (success + error, không log cache/disabled) ghi 1 dòng JSON vào `data/morning-brief/jev-decisions.jsonl` (`ts,a,b,dup,conf,reason`). Fail-safe. Backup `bsy_morning_brief.py.bak-20260920-*-pre-jev-decision-log`. **Test: alignment 8/8 · canonical 46 · jev 6/6 · incident 3/3.** File log đã làm rỗng — **dòng đầu = cron 21/09 06:28**. Sau 2 tuần: `jq 'select(.dup)' jev-decisions.jsonl` = số lần Jev thật sự loại tin.
+
+**Kết luận Jev vs Simple·Safe·Effective·Alignment:** Simple ✅ · Safe ✅ (fail-closed, ~$0.00002/ngày) · Effective ⏳ (chứng minh được trên ca 19/09, production chưa có ca thật) · **Alignment ❌ ở BÁO CÁO** (khai $0.13 — chạy $0; khai Jev gác — Jev chưa gác; khai retry — sửa tay). Code thẳng hàng, báo cáo không.
+
+**Khác:** `hungreo-xfeed.timer` **inactive**. `real-estate-watch.timer` active 08:00, `bds_watch.py` → sqlite listings, usable=5/7. Entry 19/09 bên dưới là của agent khác (chưa commit khi em vào) — em commit chung.
+
+---
+
+## ⚡ Session Handoff — 2026-09-19 — Sửa Morning Brief crash do tin trùng (`similar_title`) + graceful drop 2/3 tin (Issue `VPS-20260919-001`)
+
+**Triệu chứng:** Pipeline bản tin sáng của `suckhoe` bị sập lúc 06:28 và retry 06:50 với lỗi `world: item 2 trùng/na ná item trước (similar_title)`.
+**Root cause (VERIFIED):**
+
+1. _Upstream_: Hai tin cùng về thỏa thuận Mỹ – Đan Mạch tại Greenland (France 24 và BBC). Do `title_similarity` không tách dấu phẩy (`"us,"` vs `"us"`), similarity chỉ 0.4545 ($< 0.50$), bỏ lọt cả 2 vào `items.json`.
+2. _Downstream_: Sau dịch tiếng Việt, 2 tiêu đề trùng 88.9% từ vựng, `validate_section_news_quality` nằm ngoài try/catch ném unhandled `RuntimeError` giết chết cả pipeline tạo file.
+
+**Đã sửa 2 tầng (Hưng duyệt):**
+
+1. _Upstream_: `title_similarity` strip toàn bộ dấu câu trước khi so sánh (`0.4545 → 0.5454 > 0.50`), giúp `pick_top` tự động loại bỏ tin trùng ngay từ lần chạy 06:28 VNT. Bổ sung `deal` action và `denmark`, `greenland` vào `directed_event_key`.
+2. _Downstream (Lưới an toàn)_: `write_editorial_sections` rà soát dedup nội bộ sau dịch. Nếu phát hiện tin trùng mà không có tin thay thế, tự động drop tin trùng thứ 2, ghi warning vào manifest, và xuất bản an toàn **2/3 tin** (`✨ 2 điểm đáng chú ý sáng nay:`). `validate_rendered_news_files` nới lỏng guardrail thành `2 <= len(items) <= 3`.
+
+**Verify:**
+
+- Regression test `test_incident_20260919.py`: 3/3 PASS.
+- Full test suite: 75/75 tests PASS.
+- Live data 19/09: `manifest.status` = `ready` (world=2 items, vn=3, ai=3), đã gửi Telegram thành công tới Hưng (Msg ID 5065).
+- Issue registry: đã ghi nhận `VPS-20260919-001` trạng thái `resolved` và rebuild `ISSUE_LOG.md`.
+- Backup: `/home/hung/backups/morning-brief-similar-title-fix-20260919-0731/`.
+- **Kế hoạch Monitoring**: Quan sát lượt chạy tự động 06:28 VNT sáng mai (20/09/2026).
+
+---
+
+## ⚡ Session Handoff — 2026-09-15 — Hermes kẹt DB (bug upstream 0.21.2) + model về sol + ALIGNMENT principle
 
 **Hermes `0.21.2` kẹt từ 15/09 10:36** — `DeletedWalGenerationError`, gateway giữ inode `state.db-wal/-shm` đã bị xoá, 8 pending, `gateway.log` ngừng ghi.
 **Root cause (bằng chứng upstream, KHÔNG phải suy luận):** [NousResearch/hermes-agent#109727](https://github.com/NousResearch/hermes-agent/issues/109727) — _"any other Hermes process that opens state.db unlinks the live state.db-wal and state.db-shm; a read-only command is enough"_. Trên VPS: cron **"Bản tin sáng" 06:40** chạy process riêng → xoá WAL của gateway → tin đầu tiên Hưng nhắn sau 06:42 nổ (14/09 07:03, 15/09 10:16). Regression từ 0.21.2 (13/09 11:12, agent khác nâng); 0.21.0 chạy 06→13/09 cùng cron không lỗi. Upstream HEAD 12/09 chưa fix.

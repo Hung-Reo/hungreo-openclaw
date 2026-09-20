@@ -4,6 +4,55 @@
 
 ---
 
+### [2026-09-20] 📊 Báo cáo "Jev tiết kiệm $0.13" — model thật, số gần đúng, KẾT LUẬN sai: cherry-pick baseline + tính tiền cho thứ chạy $0
+
+**Loại:** suckhoe | jev | report-review | cherry-pick | cost-attribution | alignment
+**Discovered by:** Hưng đưa báo cáo của agent khác nhờ double-check.
+
+**Báo cáo nói:** 20/09 pass lần đầu nhờ Jev gác cổng → tiết kiệm ~29k token ≈ $0.13 so với 18–19/09; ROI 1.000×.
+**Verify:**
+
+- **Tiền:** suckhoe chạy `gpt-5.6-sol` qua `agentRuntime.id=codex` = subscription = **$0**. "$0.1652/ngày" là giá API list × token. Toàn bộ ROI xây trên số giả.
+- **Baseline:** `sessions.json` cả tháng 9 — **13/20 ngày** chạy 1 lượt, 7 ngày retry. 17/09 (trước Jev) cũng 1 lượt. Báo cáo lấy đúng **2 ngày xấu nhất** làm "trước", ngày bình thường làm "sau".
+- **Jev làm gì sáng 20/09?** Manifest **0 quyết định**. Pass vì không có tin trùng.
+- **"Retry 06:50":** `events.jsonl` → 18+19/09 cả 2 lần `error`. Sửa tay 07:19/07:33 rồi `preview_sent`. Báo cáo bỏ qua chuyện bản tin **không tự gửi được**.
+- **Jev thật:** cặp Greenland 19/09 → code cũ bỏ sót, Jev **0.87 trùng**. Effective **chứng minh được** — bằng ca 19/09, không phải bằng 20/09.
+
+**Rule rút ra:**
+
+> - **"Tiết kiệm $X" → hỏi ngay: tiền đó có thật đang trả không?** Model qua subscription/OAuth thì token = quota, không phải $.
+> - **Baseline phải là phân phối, không phải 2 điểm xấu nhất.** Kéo cả tháng ra đếm trước khi nói "trước/sau".
+> - **"Pass" ≠ "nhờ X".** Muốn gán công cho X phải chỉ được **quyết định cụ thể** X đã đưa ra. 0 quyết định = 0 đóng góp, dù kết quả tốt.
+> - **Tính năng không log quyết định = không đánh giá được.** Jev viết tử tế nhưng không ghi nó đã quyết gì → 1 ngày sau đã có báo cáo suy đoán thay bằng chứng. Log trước, đánh giá sau.
+> - **Bằng chứng effective đúng cách:** lấy **ca thật đã fail**, chạy code cũ (phải fail) + tính năng mới (phải bắt).
+> - **Bẫy git của chính tôi hôm nay:** script patch fail assertion (marker đã bị entry mới của agent khác chiếm) nhưng `git add && git commit` ở lệnh sau vẫn chạy → commit nội dung của người khác với message của mình. Patch + commit phải cùng một `&&` chain, hoặc kiểm `git diff --cached --stat` trước khi commit.
+
+### [2026-09-19] 📰 Bản tin sáng chết do lọt tin trùng tiếng Anh (dấu câu) nhưng dịch tiếng Việt trùng 89% (`similar_title`)
+
+**Loại:** suckhoe | morning-brief | dedup | title-similarity | punctuation | graceful-drop | issue-VPS-20260919-001
+**Discovered by:** Hưng báo rà soát bot `suckhoe` tin tức sáng nay (19/09). Antigravity truy qua SSH & VPS Ops Issue Registry.
+
+**Triệu chứng:** Manifest `status: error`, lỗi `world: item 2 trùng/na ná item trước (similar_title)`. Bản tin không gửi được lúc 06:28 và retry 06:50, gửi fail-safe Telegram alert (Msg ID 5063).
+
+**Root cause (2 tầng):**
+
+1. **Upstream (06:28 VNT)**: Hai bài báo tiếng Anh (France 24 và BBC) cùng đưa tin về thỏa thuận Trump/Mỹ – Đan Mạch tại Greenland. Do hàm `title_similarity(a, b)` dùng `set(a.lower().split())` không tách dấu phẩy (`"us,"` $\neq$ `"us"`), độ tương đồng chỉ đạt 0.4545 ($< 0.50$). Cả 2 lọt vào `items.json`.
+2. **Downstream**: LLM dịch sang tiếng Việt cô đọng lại, hai tiêu đề trùng nhau 8/9 từ (`Mỹ, và, Đan, Mạch, đạt, thỏa, thuận, Greenland`), độ tương đồng vọt lên 0.8888 ($> 0.58$). `validate_section_news_quality` nằm ngoài khối try/catch của từng item nên ném unhandled `RuntimeError`, giết chết cả pipeline tạo file `world.txt`, `vn.txt`, `ai.txt`.
+
+**Đã sửa 2 tầng theo chỉ đạo của Hưng:**
+
+1. **Upstream**: `title_similarity` strip toàn bộ dấu câu trước khi split từ (`0.4545 → 0.5454 > 0.50`), giúp `pick_top` nhận diện trùng ngay từ 06:28 và tự động chọn candidate tiếp theo. Bổ sung thực thể (`denmark`, `greenland`) và hành động (`deal`) vào `directed_event_key`.
+2. **Downstream (Lưới an toàn)**: Trong `write_editorial_sections`, rà soát trùng lặp nội bộ sau dịch. Nếu phát hiện tin trùng, tự động loại bỏ tin trùng thứ 2, ghi warning vào manifest, và cho phép xuất bản **2/3 tin** (`2 <= len(items) <= 3`) với tiêu đề động `✨ 2 điểm đáng chú ý sáng nay:` thay vì crash cả bản tin.
+3. **Guardrail count**: `validate_rendered_news_files` chuyển từ cứng nhắc `len != 3` sang cho phép `2 <= len <= 3`.
+
+**Verify:**
+
+- Regression test `test_incident_20260919.py`: 3/3 PASS (RED trước khi sửa $\rightarrow$ GREEN sau khi sửa).
+- Toàn bộ test suite: 75/75 tests PASS.
+- Re-apply trên dữ liệu thật ngày 19/09: `status: ready`, `world` có 2 tin sạch không trùng, `vn` đủ 3 tin, `ai` đủ 3 tin, thời tiết đủ.
+- Ghi nhận canonical issue `VPS-20260919-001` trên VPS registry.
+- Backup: `/home/hung/backups/morning-brief-similar-title-fix-20260919-0731/`.
+
 ### [2026-09-15] 🧪 Test "phải chặn" trên production → bot LÀM THẬT: đổi model production trong 3 phút, dù có HARD RULE + Alignment
 
 **Loại:** alignment | test-design | hungreo | production-side-effect | prompt-identity
