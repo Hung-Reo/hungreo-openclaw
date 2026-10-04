@@ -2,6 +2,282 @@
 
 > **Agent instruction:** File này là shared knowledge base cho tất cả agents (Claude Code, hungreo bot, Nemo, Codex). Sau mỗi incident hoặc upgrade có vấn đề, ADD một entry mới ở đầu file (dưới dòng này). KHÔNG xóa entries cũ.
 
+> **Tra index trước (2026-09-21):** `kb/lessons-learned.index.md` — 75 entry, 1 dòng/entry (ngày · tags · bài học · số dòng). `grep -i <tag|từ khoá>` trong index rồi nhảy tới dòng tương ứng ở file này; đừng đọc cả 32k từ. Thêm entry mới → thêm 1 hàng vào index.
+
+---
+
+### [2026-10-04] Bot "không tự action được" = mỗi lượt bị cắt ở 180s, không phải mất năng lực
+
+**Loại:** timeout | execution-budget | codex-app-server | multi-step-task | config
+
+**VERIFIED:** "Codex reached the configured execution time limit" (Telegram) = journal `codex app-server execution budget timed out ... elapsedMs=180000`. Budget lấy từ `agents.defaults.timeoutSeconds` (upstream default 48h; 180 do mình đặt). Việc nhiều bước ("proceed cả 3") tiêu hết 180s ở pha đọc/kiểm, bị cắt trước khi sửa gì; lượt sau làm lại từ đầu → nhìn như bot "không làm được". Luật mềm "ngân sách lượt" trong AGENTS.md không giữ được (~40 lệnh/lượt). Đổi 180→600 cho Hungreo (hot reload, không restart); Suckhoe giữ 180 (p99 125s).
+
+**Rule:**
+
+> - Bot trả "execution time limit" → grep `execution budget timed out` + `elapsedMs`; nếu trùng khít timeout config thì là **cắt bởi config**, không phải model/provider (cùng pattern Addendum 2026-06-06 `timeoutSeconds=45`).
+> - Chọn timeout bằng **phân phối thời gian lượt thật** (Codex rollouts `task_started`→`task_complete`, p95/p99/max lượt nặng), không đoán; lượt bị cắt không cho biết thời gian cần thật.
+> - `agents.defaults.timeoutSeconds` áp cho cả cron `agentTurn`/heartbeat không set timeout riêng — liệt kê trước khi đổi.
+> - Hết giờ không kích hoạt fallback trả tiền (`fallback chain stopped: reason=agent_run_terminal_timeout`).
+
+Chi tiết: `SESSION_HANDOVER.md` entry 2026-10-04 15:35.
+
+---
+
+### [2026-10-02] Tĩnh nguyện không gửi: validator cấm "tôi" cả trong trích dẫn nguyên văn nguồn
+
+**Loại:** devotional | validator | false-reject | deterministic-failure | independent-review
+
+**VERIFIED:** tiêu đề tập 02/10 là "GIỜ TÔI BIẾT LÀM GÌ ĐÂY?"; model trích nguyên văn “Giờ tôi biết làm gì đây?” vào `reflection` ba lần (06:00, 06:20, 06:45), `validate_generated` từ chối cả ba (`voice must use mình, not tôi`) ⇒ không ai nhận tin. Lỗi tất định: regenerate cho cùng kết quả nên catch-up không cứu được. Sửa: bỏ qua "tôi" chỉ trong trích dẫn ≥4 từ, ≤300 chars, nguyên văn nguồn. Review độc lập tìm thêm bypass do chính patch (ghép cặp ngoặc thẳng bị lệch khi có cặp rỗng/đoạn quá dài) và bypass sẵn có (NFD/zero-width "tôi").
+
+**Rule:**
+
+> - Guard "cấm X trong giọng của bot" phải loại phần **trích dẫn nguyên văn nguồn**; nếu không, một tiêu đề/ca dao/lời trích chứa X sẽ chặn cả bản tin và retry vô ích. Khi một job lỗi giống hệt N lần liên tiếp: coi là lỗi tất định, đọc đầu ra thật đối chiếu với validator trước khi nghĩ tới retry/model/mạng.
+> - Regex ghép cặp dấu ngoặc có giới hạn độ dài: ngoặc thẳng (mở = đóng) có thể bị lệch cặp khi vượt giới hạn → kiểm độ dài **trong** hàm, không trong regex.
+> - Patch cho guard: bắt buộc test với **dữ liệu thật của sự cố** + control (test mới phải fail trên bản cũ) + 1 vòng review fresh-context tìm bypass; review đã bắt lỗi mà test tự viết bỏ sót (đúng lesson 2026-09-21).
+
+Chi tiết: `tools/openclaw-ops/devotional-validator-20261002/README.md`, `SESSION_HANDOVER.md` entry 02/10 09:30.
+
+### [2026-10-01] Suckhoe "chỉ read-only": luật ở 4 lớp mâu thuẫn; allowlist có shell = không có giới hạn
+
+**Loại:** exec-policy | allowlist | rule-conflict | suckhoe | handoff | audit-misread
+
+**VERIFIED:** SOUL.md (Suckhoe không chạy lệnh, bàn giao Hungreo) + plugin `suckhoe-technical-handoff` (worker active, 3/3 job xong) đúng ý Hưng, nhưng AGENTS.md vẫn ghi "Suckhoe vẫn là người thực hiện sau duyệt" và runtime vẫn cho exec: effective policy `allowlist/on-miss` nhưng allowlist chứa `/bin/bash`, `/usr/bin/sh`, `python3`, `sed`, `openclaw` ⇒ chạy lệnh tuỳ ý không hỏi; Suckhoe từng chạy `openclaw cron disable` ×4 (25/09). Audit báo "exec security=full" là giá trị _requested_, effective là bên stricter (host approvals).
+
+**Rule:**
+
+> - Khi nói "chỉ read-only/chỉ sức khoẻ": kiểm đủ 4 lớp — plugin/hook, SOUL.md, AGENTS.md, **effective** exec policy (`openclaw exec-policy show`, không đọc riêng `tools.exec`) — rồi sửa cả bốn cho khớp. Luật chữ mâu thuẫn nhau là nguồn sự cố 05/09.
+> - Allowlist có shell/interpreter (`bash`, `sh`, `python3`, `sed`) ≈ full exec. "Read-only" chỉ ép được bằng `deny` (preset `deny-all`) hoặc allowlist không chứa shell/interpreter và có kiểm đối số.
+> - Cron `command` job không đi qua `tools.exec` của agent (docs `payloads.md`) ⇒ khoá exec của agent không làm chết bản tin/nhắc thuốc theo lịch; việc tạo/sửa job của agent thì phải qua Hungreo.
+> - Áp bằng CLI chính thức (`exec-policy preset`), `tools.*` hot-reload (~30s), có backup + lệnh rollback (`preset cautious`).
+> - ⚠️ **ĐÍNH CHÍNH 19:30:** `tools.exec.mode=deny` (preset `deny-all`) làm **Codex app-server từ chối chạy** ("local execution is unavailable because effective tools.exec.mode=deny") ⇒ mọi lượt agent rơi sang fallback trả tiền (Muse Spark). Với runtime Codex, KHÔNG dùng `deny`; "chỉ-đọc" phải bằng `allowlist + ask=always` (mọi lệnh cần Hưng duyệt) hoặc allowlist không có shell. Dọn allowlist qua `approvals allowlist remove` bị từ chối vì entry legacy có trường `comment` (cần `approvals set` thay cả document).
+> - **Sau mọi đổi chính sách exec/tools: chạy ngay 1 lượt UAT no-deliver ("Reply with exactly UAT_OK") và kiểm `winner=gpt-6-sol, attempts=1, không fallback`** trước khi báo xong. Hot-reload "applied" ≠ agent còn chạy được (lesson 2026-09-25 tái diễn). Có kèm auto-rollback trong cùng lệnh.
+
+Chi tiết: `SESSION_HANDOVER.md` entry 01/10 15:40 và 19:30.
+
+### [2026-10-01] Voice Suckhoe: hai lỗi khác nhau — từ chối nhanh (RAM) và sai chữ (ASR base)
+
+**Loại:** voice | whisper | asr-model | memory-gate | ab-test
+
+**VERIFIED:** 10:13:30 lỗi `ExecaError` sau 278ms, không có worker unit ⇒ wrapper từ chối trước `systemd-run` (nghi `VOICE_MEMORY_BUSY`: gate 1792MiB vs MemAvailable idle ~2.1GiB; reason code không được gateway ghi). 11:42 wrapper chạy bình thường nhưng transcript sai: prod dùng openai-whisper `base` fp32; Hermes dùng faster-whisper `small` int8. A/B cùng file: small đọc hiểu được, nhanh hơn, peak RAM thấp hơn cap.
+
+**Rule:**
+
+> - "Voice lỗi" có ≥2 kiểu: **từ chối** (không có worker unit, <1s) vs **sai chữ** (worker chạy xong). Phân loại bằng journal worker unit + thời lượng trước khi đổ cho RAM.
+> - So sánh với hệ thống khác cùng máy (Hermes) bằng **cấu hình + A/B trên cùng file**, không bằng cảm giác. Model nhỏ nhất vừa cap RAM không phải model đủ tốt cho tiếng Việt.
+> - Reason code nằm ở stderr wrapper nhưng gateway chỉ log `ExecaError` ⇒ cần ghi code vào journal để lần sau khỏi suy luận.
+
+Chi tiết: `SESSION_HANDOVER.md` entry 01/10 11:55.
+
+**Kết quả sửa (13:10, GO phương án 1):** wrapper dùng faster-whisper small int8 trong venv riêng (`/home/hung/.openclaw-voice`), giữ nguyên cap/gate/lock. Sweep 14 file thật: 12 ok, peak ≤843MiB. Không đổi config OpenClaw hay restart (mỗi voice note exec wrapper mới). UAT Telegram của Hưng còn chờ.
+
+### [2026-10-01] Xóa raw backup phải kiểm thay thế đầy đủ
+
+**Loại:** storage-cleanup, archived-restore, sha256, sqlite-schema, isolated-boot, process-reference, review
+
+**VERIFIED:** Hưng GO cleanup; hai raw precutover bị xóa sau fresh full extract +107,201file SHA/size/mode/link/directory comparison và26SQLite PASS. Archive checksums khớp Mac; boot7.1-2 quarantine đọc đúng archivedstores,512MiB/noswap/0.5CPU/networknone. Disk82→69%, free18→30GiB; livePID/config/9.6/Sol6 giữ nguyên, no newunitOOM/restart. Archives/daily/rollbackruntime/voice deps giữ lại; ownlarge scratch/containers đã dọn.8guardtests + independentreview PASS.
+
+**Bài học:** tuổi backup/mtime/số file/readyz không chứng minh raw đã được archive đủ. Kiểm từng hash+mode+link và bắt buộc critical DB/schema tồn tại trước boot; SQLite connect default có thể tạo emptyDB và tạo falsePASS. Proc scan user bị permissiondenied chưa phải zero-reference; cần fresh metadata-only rootcheck zero denials ngay trước xóa. Pin parentfd/inode, reject mount/symlink/special, rename rồi safe rmtree; failure sau rename phải reconcile, không retry mù.
+
+**Giới hạn:** quarantined boot không chứng minh full oldplugin/auth/channel/model rollback vì execution bị tắt; raw không còn undo rename, muốn phục hồi phải giải nén retainedarchive vào destination mới và xin GO riêng nếu đụng live. Rehearsal reserve thấp phải abort trước container, không hạ gate để ép PASS. Mac Docker privilegedsetup bị chặn thì chọn existing VPS runtime bounded/sequential theo GO, không claim Macboot hoặc cài dependency. Không gọi cleanup “100% safe”, không tính lại6GiB đã xóa27/09 và không quy diskcleanup thành fix RAM/native tool.
+
+Report `live-vps-snapshot/2026-10-01-storage-cleanup/report.md`; guards/evidence tracking chỉ local, unrelated WIP preserved, no commit/push/model/upgrade/restart/cron/send.
+
+### [2026-09-30] Bounded voice và schema/pipeline đúng bản cài
+
+**Loại:** voice, resource-cgroup, schema-drift, canonical-media, transcription-accuracy, native-tool-timeout
+
+**VERIFIED:** bounded voice appliedboth17:15: existingbase.pt,oneCPU/1280MiB/no swap/45s separateunit,8MiB/30s/singlelock/memoryreserve;10worker12guardtests + actualinstalledmediaDM pipeline bothPASS,groupsdenied. Localrepo typedaudio.models wasnotaccepted byinstalled9.6 schema; officialdryrun rejectedbeforewrites. Sharedtools.media.models isactualshape. Canonicalmediafacts `ctx.media` areactualinput; staleMediaPath aloneproducesno processing, so assertionmustrequire actualTranscript+decision+oneattempt, notexit0/Body.
+
+**Accuracy:** syntheticVietnamese6.14s/~730MiB,onewordwrong despitegoodscore; confidenceheuristicsarenottruth. Prompt asksconfirmation foruncertainnames/doses; realTelegramvoiceUATpending. Resourceadmissioncan rejectbusy/lowRAM; point-in-time availableRAMdoesnotguarantee futureglobalpressure. AdvertisedWhispermuststaydeniedwhenboundedvoiceON, otherwiseenablingaudio silentlyopensunboundedturboexecagain.
+
+**Native issue:** allowingwaitdidnotrepairSuckhoe'ssimpleprintf;90stimeout/noapprovalrow/nofallback confirms separatetoolpathdefect, notWhisperload. Tracecheckpoint/dispatch andreleasedsourcebeforefix;9.7relevantfixnotesdo notprove thisexactcasefixed. UserprohibitsLLM/modelmodulechanges andVNStockSol6revertverified; voiceASRdoesnotauthorizeSol6.1orProductionupgrade.
+
+Report `live-vps-snapshot/2026-09-30-bounded-voice/report.md`; protectedbackup `/home/hung/backups/bounded-voice-20260930-165846/`; independentcandidateAPPROVE afterfailure/cancel/metrics/integrationtestgapsresolved. Noauth/runtime/restart/send.
+
+### [2026-09-30] OAuth recovery và tool result chưa hoàn tất
+
+**Loại:** oauth-repair, cli-guard, config-drift, native-codex, yielded-cell, tool-result, evidence-scope
+
+**VERIFIED:** HưngGO → fresh Hungreo official device-code login target `openai:default`/main; failed fence cleared; fresh exactSol6 gateway reply `HUNGREO_AUTH_OK`, one attempt/no fallback/no tools. Both Whisper console guard applied:10 VPS tests/cgroup-policy fixtures/PATH/hash PASS. Login tự thêm empty Astra allow entry dù chọn Keep restrictions; diff baseline rồi official unset đúng một field, final config semantic equal baseline. Không sửa expiry, copy token, import legacy hoặc restore cả SQLite.
+
+**Test lesson:** Suckhoe refused guard--help theo policy, rồi cgroup-only exec trả yielded cell31s và native error `tool.call without a matching tool.result before the turn completed`. CLIexit0/statusok và modelreceipt success chỉ chứng minh assistant turn, không chứng minh tool thành công. Real child enforcement/self-support vẫn chưaPASS; root cause tool lifecycle chưachốt. Không ép bot bỏpolicy hoặc gán lỗi choRAM khi chưatrace.
+
+**Review/report:** candidate review độc lập APPROVE; primary-agent Production evidence review bounded APPROVE, ghi rõ giới hạn console bypass và actualchildUAT. VoiceOFF, defaultsSol6/PIDs/budgets/fallback giữ nguyên; no restart/send/node_modules patch. Report `live-vps-snapshot/2026-09-30-auth-guard-production/report.md`. Auth response recovered không đồng nghĩa toàn hệ thống ổn định hoặc voiceusable. Tiếp theo reproduce/trace native yielded-cell result trên copy trước runtimechange.
+
+### [2026-09-30] Failed auth fence và Whisper vẫn chạy sau policy
+
+**Loại:** auth-refresh-fence, canonical-auth, voice, exec-bypass, actual-transcript, fallback, test-scope
+
+**VERIFIED:** Hungreo15:38 primary báo no usable profiles →15:39 Muse fallback. Hai OpenAI profiles là failed refresh fences (`expires=1` và failed marker), store updated12:33. Marker là trạng thái vô hiệu của refresh generation, không phải ngày hết hạn để sửa sang tương lai. `token_revoked` ở memory embeddings là evidence consumer khác; chưa biết trigger refresh failure ban đầu.
+
+**Rule:** lấy canonical owner từ `models auth list`/installed source trước khi đọc DB: lần này shared store trong `state/openclaw.sqlite`/`config_machine_state`, local agent auth tables rỗng là inheritance, không phải no-auth. Không copy token/grant từ Suckhoe/Hermes hoặc restore toàn DB; fresh per-profile sign-in + exact terminal receipt mới kiểm được repair. Shared account label không tự chứng minh shared refresh generation.
+
+**Voice:** actual transcript15:38 sau patch12:44 vẫn execWhisper tiny rồi kill. Fresh hypothetical Suckhoe UAT/skill exclusion không bảo đảm phiên cũ/fallback giữ policy. Local CLI guard chọn service cgroup, chặn advertised console entry trước torch/model import,10testsPASS; chưadeploy và không chặn directPython/originalentry/shell bypass. Không gọi nó là hard security boundary. Suckhoe16:03 primarySol6 contentcheckPASS không phải actualvoice/device hoặc long-termRAM PASS.
+
+Report `live-vps-snapshot/2026-09-30-afternoon-auth-audit/report.md`; auth/CLI targets mới cần GO, original4docs2keys deployment giữ nguyên.
+
+### [2026-09-30] Voice OFF không chặn Whisper qua exec; test đúng runtime và giữ giới hạn evidence
+
+**Loại:** voice, whisper, exec-bypass, policy-drift, runtime-9.6, behavioral-test, review
+
+**VERIFIED live:** Hungreo audioEnabled=false nhưng transcript SQLite ghi agent đọc skill openai-whisper rồi exec small/turbo07:03–07:04 và tiny/base09:00–09:02. Lượt07:17 OOM/timeout và09:03 timeout180s; exact OOM victim và lý do timer180s kéo dài851s vẫn UNVERIFIED. Tắt media preprocessing không tắt generic shell hoặc skill đang eligible. Không gọi mọi dòng exec mirror là một process mới.
+
+**Candidate local, chưa Production:**4 workspace files +2 official config operations vô hiệu skill openai-whisper, explicit no manual retranscription khi voice OFF, xin text nếu thiếu transcript; sửa model subagent cũ và canonical runtime/state paths. Hungreo subagent timeout300s/thinking medium là đúng live, giữ nguyên; không quy mọi con số300s trong docs thành stale chỉ vì main budget180s. Suckhoe scheduled morning policies giữ byte-identical ngoài mục Voice.
+
+**Evidence:**11unit testsPASS; actual installed9.6 skill-filter trên copied config trongRAM chứng minh BEFOREeligible→AFTERexcluded, kể cảalways=true, weather giữeligible.8caGPT-6Solcontent-only UAT/no tool itemsPASS. Review độc lập khôngblocker; finding optionalduplicateVoiceanchor đã sửa +regressiontest. Eligibility không phải hard exec deny; UAT rules riêng không phải full gateway/Telegram/voice workload UAT. CLI globalCodex thiếu nativebinary; dùng bundledCLI cósẵn, khônginstall/sửa node_modules.
+
+**Rule:** mitigation phải phủ cả preprocessing, skill discovery và hành vi exec. Không báo sửa xong toàn hệ thống khi mới patch guidance. Diff/hashes giữconcurrentWIP; config rollback hẹp theofield/presence, khôngrestore cảprofile. Runtimecatalog/state-lifecycle vàmemory phải córeproduction/fixmapping/rehearsal riêng; upstreamPRmerged không tựchứngminh packageinstalled đãfix.
+
+Artifacts: `live-vps-snapshot/2026-09-30-stability-candidate/`; source/deploy/rollback `tools/openclaw-ops/stability-20260930/README.md`. Chưadeploy/restart/send hoặc đổi model/auth/fallback/budget.
+
+**Bổ sung Production30/09 13:13:** HưngGO →4docs2skillkeysapplied12:44;11VPStests+liveeligibilityPASS. SuckhoeassembledgatewaypolicySol6/harnessCodex/profileauth/no tools/no fallbackPASS; Hungreo freshgatewayUATauthfileguard chưaPASS. VNStockSol6.1exactadapter/includedPASS vàđãapply2fields; H/SgiữSol6. Legacyhome standalone400/tempauth401 khôngđại diệngatewayauth; inventory/docs/catalog khôngthayinference receipt đúngroute. Real6.1Suckhoetrial timeouttrongcatalogreload; tempconfigrestore+bothready/PIDunchanged khôngbiếntrialfail thànhmodelPASS. Reloadregistry cóthểtạoCPUburst/supersededwarnings; dừngretrylặp, khôngrestartđểépPASS. Report `live-vps-snapshot/2026-09-30-stability-production/report.md`. Rollbackhẹp theohash/value, giữoldGOrecord; newestownerGO/apply ởVNStockissue123. KhôngclaimOOM/catalog/auth đãfix.
+
+### [2026-09-29] OOM lần 2 do process con + OOMPolicy=continue; đề xuất "stale" vì không đọc lại handover
+
+**Loại:** oom | oompolicy | systemd | stale-proposal | multi-agent
+
+**VERIFIED:** Hungreo OOM-kill 11:35:02 (lần 2 sau 08:15 hôm 28/09): main PID vẫn log sau kill → victim là process con `codex app-server`, `OOMPolicy=stop` dừng cả gateway (peak 5.1G). Áp `OOMPolicy=continue` cả hai gateway bằng drop-in `zzz-oom-policy.conf` + `daemon-reload` (không restart; PID/NRestarts không đổi). Docs systemd: `continue` vẫn log sự kiện → alert healthcheck (khoá theo unit + chuỗi `OOM killer`) không bị mất.
+
+**Rule:**
+
+> - Trước khi đề xuất/nhận "việc P0", **đọc lại entry handover mới nhất + `systemctl show` live**: Claude Code đề xuất "sửa alert healthcheck" ~30h sau khi Codex đã apply (28/09 11:16) và alert đã bắn thật 29/09 12:01. Nhiều agent cùng ghi handover ⇒ trạng thái trong đầu agent stale nhanh.
+> - `daemon-reload` in ra `app.slice/-.slice: A process of this unit has been killed by the OOM killer` (bộ đếm tích luỹ, không phải OOM mới) — đối chiếu với dòng cấp **service unit** trước khi báo OOM.
+> - `OOMPolicy=continue` đổi hệ quả OOM từ "restart gateway + mất reply" sang "hỏng 1 lượt", nhưng bỏ luôn tác dụng reset RSS của restart tự động → cần theo dõi RSS (`memory pressure` log) và restart kế hoạch có GO.
+
+Chi tiết: `SESSION_HANDOVER.md` entry 29/09 14:20. Rollback: xoá 2 file `zzz-oom-policy.conf` + `daemon-reload`.
+
+### [2026-09-29] Bản tin lỗi ngôn ngữ, devotional từ chối và heartbeat sai nguồn
+
+**Loại:** morning-brief | devotional | policy-conflict | heartbeat | canonical-state | evidence
+
+**VERIFIED:** receipts06:28/06:50 fail doAIitem3ratio0.67, chưagửibrief;06:51ACK làfailurealert. Tĩnhnguyện06:00 cónguồnnhưngmodel từchốihealth-only, dẫnJSONDecodeError;06:20 mớiACKboth. Khôngcoi receiptok/source-deferred hayserviceactive làdeliveryPASS.
+
+**Bài học:** languagegate strict cóthểisolatemộtitem nếu>=2validdistinct còn lại; không nớigatefacts/English/dedup đểépPASS. Reproduceactualfixtureoncopy/networkblocked: baselinefail→candidate3/3/2ready. ExceptionMorningBrief trongSOUL không tựcho phépdevotional; thêmngoại lệhẹp JSONscheduledtask, không tool/outboundpermission vàkhôngche lời từchối bằngparserfallback.
+
+**Hungreo:** falsealert dùngunitkhôngtồn tại`hungreo.service`; bot sửaunitidentity trongcanonicalheartbeat scratch06:40, nhưngcácpathmemoryrelative vẫntrỏstate-rootcopy vàapply_patch đúngchặn ngoàiworkspace.9.6 scratch làSQLite/officialCLI, khôngtạo lạiHEARTBEAT.md; dùngabsoluteworkspacepaths, giữconcurrentedits/revision vàkhôngvượtguardbằngshell. Agenttranscript9.6 đọc`transcript_events` đúngsession quaSQLiteRO khiJSONLkhôngcó.180sDMtimeout làterminalexecutionbudget, khôngchứngminhgatewaydown.
+
+**Status:**3 localcandidates,8new +48existingunittest +10alignmentcases +12devotionaltests PASS; ProductionGO/modelUAT/schedulednextdeliverypending. Report`live-vps-snapshot/2026-09-29-morning-reliability/report.md`. Khônggửi bùsau07:00, khôngtạo lịchtrùng/đổlỗiRAMtheoevidencecũ.
+
+**Bổ sung GO Production07:08:**3patches applied07:05, hasheslivekhớp/officialscratchCAS2→3, VPS8/8PASS; content-onlyactualGPT-6SolUAT1attempt JSON/source/wordlimitsPASS, no tools/sender. PID/config/cron unchanged. Backup`/home/hung/backups/morning-reliability-20260929-070247/`0700/originals0600. Lượtstaging đầu chạykhiuploadfixturechưa xong→test chặn trước mutation; phải đợi dependentexecsessioncomplete +verifyuploadhashes trướctest/apply. Không coi modelUAT lànextmorningTelegramdeliveryPASS; khônggửi bùsau07:00.
+
+### [2026-09-28] Service active sau restart không phủ nhận OOM hoặc reply gián đoạn
+
+**Loại:** oom | monitoring | evidence-freshness | cgroup | production-readonly
+
+**VERIFIED:** audit07:20 ghi Hungreo NRestarts0; live08:26 ghi NRestarts1. Journal xác nhận OOM-kill, dispatch lỗi, automatic restart08:15 và gateway ready08:16. Audio config hiện OFF; chưa đọc được kernel record do quyền sudo, chưa xác định killed PID/comm hoặc tác vụ gây peak RAM. Không gán nguyên nhân whisper từ incident25/09.
+
+**Rule:** đối chiếu PID/NRestarts và journal theo thời điểm; counter cgroup phiên mới có thể reset, RSS/RAM available hiện tại không chứng minh peak quá khứ. `active`/`ready` sau restart không thay UAT các reply bị gián đoạn. Muốn chốt root cause OOM cần kernel record + tác vụ cùng cửa sổ, trước khi đổi model/config/budget.
+
+Evidence và limits: `live-vps-snapshot/2026-09-28-readonly-audit/report.md`; không đổi Production.
+
+**Bổ sung 08:40 (Claude Code):** main node PID735519 vẫn ghi log sau thời điểm OOM-kill (08:15:06, 08:15:08) ⇒ OOM giết **process con**, rồi `OOMPolicy=stop` dừng cả gateway + replay — cùng cơ chế khuếch đại 25/09, lần thứ hai. Không có alert nào tới Hưng vì `openclaw-healthcheck.sh` đọc token từ `.channels.telegram.botToken` (key không tồn tại từ ≥04/2026). Restart kế hoạch Suckhoe theo GO 08:37 → ready 47s, RAM available 2676→3821 MiB; restart chỉ reset RSS, không sửa gốc. **Guardrail chống tái diễn (đề xuất, chưa áp):** drop-in `OOMPolicy=continue` + sửa đường alert healthcheck.
+
+**Bổ sung 11:03 (local candidate, chưa Production):** reproduction trên copy chứng minh missing token bị skip/return0 nhưng failure transition vẫn bị consume. Dùng outbox riêng cho delivery; persist `sending` trước HTTP và giữ uncertain nếu mất ACK/crash, không resend mù. User journal systemd manager cần attribution từ `USER_UNIT`, không `_SYSTEMD_USER_UNIT=init.scope`; `journalctl --grep` không match trả exit1/empty, không đồng nghĩa journal hỏng. Cursor cũng phải advance khi healthy để tránh baseline cũ bị rotation. Candidate `tools/openclaw-ops/` có28 offline tests + real journal replay PASS, detect Hungreo OOM/automatic restart và bỏ qua Suckhoe planned restart; GO Production/delivery UAT vẫn pending.
+
+**Bổ sung 11:16 (GO Production applied):** credential resolver đã khớp gateway process + getMe auth/connectivity PASS;28tests trên VPS và systemdhealthcheck thật16.32s PASS. Wrapper/helperlive khớpcandidate, statev2/0600/no pending; timer30phút active, gatewayPID/config giữ nguyên. Alert tự động bật nhưng chưa deliveryUAT thật (không gửi test). Backup script/state/unit/candidate trước cutover; rollback giữoutbox/uncertain/evidence. Không coi alertfix là fixmemoryrootcause/OOMPolicy. Report `live-vps-snapshot/2026-09-28-healthcheck-production/report.md`.
+
+### [2026-09-27] Sau major upgrade: canonical CLI, source-deferred và send ack không xác định
+
+**Loại:** upgrade | finance | devotional | cron | timeout | idempotency | stale-snapshot
+
+**VERIFIED:** Finance cron vẫn trỏ CLI npm-global cũ dù gateway9.6 đã chạy; CLI wrapper mới có plugin finance. Devotional source missing exit75 tích lỗi/backoff; transport timeout30s không chứng minh tin chưa gửi. Snapshot cũ do night report đã HOLD, không nên bật lại lịch đã chủ động dừng chỉ để refresh state.
+
+**Rule:** inspect đúng SQLite cron_jobs và command executable; CLI --help PASS chưa chứng minh reminders delivery. Phân biệt nguồn chưa có (business deferred) với model/transport failure; không dùng service active hay cron status ok làm delivery receipt. Khi ack timeout, persist uncertain target và chặn resend cho đến reconcile; tăng timeout không tự giải quyết duplicate risk. Snapshot runtime mới phải ghi rõ business priorities cũ, giữ GO/HOLD và không tự nâng budget Codex dựa một lượt hết giờ.
+
+**GO applied:** Finance CLI/no-output120/total180; devotional timeout360, source-deferred exit0, sender timeout60 riêng với uncertain guard; snapshot refresh theo yêu cầu. 20 test cases PASS trên copy; không gửi test Telegram. Receipt sau patch chờ28/09. Chi tiết `SESSION_HANDOVER.md` entry15:30 và backup `/home/hung/backups/postupgrade-followup-20260927/`.
+
+### [2026-09-27] Devotional: source-deferred tích lũy auto-disable và catch-up bị backoff
+
+**VERIFIED:** job 05:45 lỗi `grounded source unavailable` exit75, đủ 10 consecutive failures → OpenClaw 9.6 auto-disabled (SQLite state.autoDisabled reason=consecutive-failures). Catch-up 06:00 exit1; receipts không có 06:20/06:45, lần sau 07:00:57 gửi đủ hai IDs 07:01. Code default backoff lần lỗi thứ 5=1h khớp timeline; Follow-up14:54: structured runtime log chứng minh exit1 là CLI gửi Telegram TimeoutExpired30s; log cũng xác nhận backoffMs3600000. Jev TypeSafe403 response là authentication_error, không gán quota khi chưa có evidence. Main source/model copy PASS hôm trước không bảo đảm cron ngày sau PASS.
+
+**Rule:** kiểm enabled + autoDisabled + consecutiveErrors + actual receipts, không chỉ cron expr. Nhiệm vụ source-deferred phải được phân biệt với lỗi vĩnh viễn trước khi chọn failure/backoff policy; không tự thay exit code hoặc cron. Xin GO target-specific để re-enable; re-enable không phải root-cause fix. Business receipt đủ hai người là delivery PASS nhưng trễ slot vẫn cần báo rõ.
+
+Chi tiết/GO proposal: `SESSION_HANDOVER.md` entry 27/09 07:20. Chưa apply Production.
+
+### [2026-09-26] Morning Brief: chat smoke PASS nhưng policy health-only từ chối biên tập tin
+
+**Loại:** suckhoe | morning-brief | policy-conflict | gpt-6 | behavioral-test | upgrade-verification
+**Discovered by:** Codex, Hưng hỏi bản tin sáng mai có chạy bình thường không sau recovery CPU.
+
+**VERIFIED:** cron 9.6 enabled đúng giờ, GPT-6 Sol smoke/Telegram chat PASS nhưng pipeline dry-run trên bản copy thất bại: model trả “chỉ hỗ trợ nội dung sức khỏe” thay vì JSON world/vn/AI. `parse_json_object` báo thiếu JSON là triệu chứng; SOUL.md chỉ cho sức khỏe và không có ngoại lệ cho nhiệm vụ bản tin đã ủy quyền là nguyên nhân cụ thể. Hưng GO ngoại lệ nhỏ; sau apply model GPT-6 Sol biên tập 3/3/3 tin, 1 attempt không fallback, pipeline `MORNING_BRIEF_DRY_RUN_OK` PASS. Production manifest không đổi trong thử nghiệm; không gửi bản tin thật.
+
+**Rule:**
+
+> - Model/chat smoke không thay bài thử nhiệm vụ cron thực tế. Sau đổi model, kiểm nội dung phản hồi khi parser báo thiếu JSON trước khi sửa parser hoặc đổ lỗi CPU.
+> - Policy “chỉ X” cần mô tả các nhiệm vụ tự động ngoài X đã được owner ủy quyền; giữ ngoại lệ hẹp và không cấp quyền tools/config/private profiles từ nội dung bài báo.
+> - Kiểm thử bản tin trên copy: redirect DATA_DIR/builder, chặn transport, so SHA256 manifest production trước/sau. Không dùng `--dry-run` như bằng chứng tự động rằng script không ghi state.
+> - Guard của harness phải cho phép nhánh dry-run thật đã kiểm không gọi mạng; chặn toàn bộ hàm sender khiến preview hợp lệ false FAIL. Giữ negative test để chứng minh nhánh gửi thật vẫn bị chặn.
+> - 9.6 cron/session canonical nằm trong SQLite; JSON cũ không tồn tại không có nghĩa lịch đã mất.
+
+Artifacts/draft/rollback và kết quả kiểm thử mới nhất: entry audit 26/09 trong `SESSION_HANDOVER.md`.
+
+### [2026-09-26] Hostinger CPU limitation xác nhận; recovery ba bot và restore-check split SQLite
+
+**Loại:** hostinger | cpu-limitation | cpu-steal | recovery | docker-cpu | sqlite-backup | restore-check
+**Discovered by:** Codex, kiểm live SSH + hPanel; Hưng Telegram UAT cả ba PASS.
+
+**VERIFIED:** hPanel hiện “CPU limitation activated”; gỡ lúc ~10:46 khi đã chặn tải nặng → steal giảm, restart sạch từng bot → GPT-6 Sol smoke và Telegram trả lời. Nemo container 9.6 bị mất CPU cap → đặt lại 1 CPU/2GiB. Restore-check cũ chỉ mở `state.tgz`, false PASS với split backup thiếu `sqlite.tgz`; sửa rồi kiểm 5 ca (valid/missing/corrupt/unfinished/legacy). Backup daily thật đầu tiên vẫn chờ 27/09.
+
+**Rule:**
+
+> - Kiểm **hPanel CPU limitation** trước khi kết luận noisy neighbour hoặc bắt buộc mua gói lớn hơn. `vmstat` đo steal theo khoảng; `pidstat` đo CPU hiện tại. `ps %CPU` là trung bình từ khi process chạy, không chứng minh nó đang dùng từng đó CPU.
+> - Config catalog OFF trên đĩa chưa đảm bảo runtime áp dụng nếu hot-reload hỏng. Khi đã đủ CPU, clean restart tuần tự và kiểm winner model + Telegram thật.
+> - CPU cap Docker cần có trong cấu hình recreate, không chỉ `docker update` container hiện tại. Startup burst phải phân biệt với idle CPU kéo dài.
+> - Producer backup đổi format → consumer restore phải đọc cả hai archive, bỏ `*.tmp`, kiểm checksum/integrity và test **thiếu/hỏng dữ liệu**, không chỉ ca hợp lệ.
+> - Không xoá override Luna của subagent vì nó khác main Sol: audit đúng main/DM scope, xem `spawnDepth`/session role trước khi kết luận drift.
+
+Artifacts/giới hạn và timeline: `SESSION_HANDOVER.md` entry recovery 26/09 11:10; `/home/hung/backups/cpu-recovery-20260926/`. Chưa chứng minh tác vụ nào đóng góp bao nhiêu vào throttle trước đó; removal không bảo đảm không tái phát.
+
+### [2026-09-26] ⏳ OpenClaw 9.6 + CPU steal cao: restart → exit 78, hot-reload → runtime hỏng
+
+**Loại:** 9.6 | cpu-steal | lease | restart | hot-reload | hostinger
+**Discovered by:** Claude Code (Opus 5.5), điều tra CPU 100% hPanel.
+
+**Chuỗi (VERIFIED):** từ ~03:00 26/09 VPS CPU steal 60–90% (load thấp vẫn steal cao; backup tar/gzip + catalog refresh 6h lúc 03:00 góp phần). Gateway 9.6 dùng lease DB có heartbeat: (1) **restart** suckhoe 06:45 & 06:56 → `startup migrations did not complete cleanly … agent database maintenance lease … was lost` → **exit 78** → systemd không tự lên (`RestartPreventExitStatus=78`); lên được khi tạm stop hungreo (07:31). (2) **hot-reload** config plugin 10:17 → `plugin lifecycle lease … was lost` + `Plugin runtime rollback could not republish the model runtime` → cả 2 bot nhận tin nhưng 0 trả lời.
+
+**Rule:**
+
+> - Đo steal trước mọi restart/hot-reload (`vmstat 5 2` cột `st`). Steal > ~40% → KHÔNG restart, KHÔNG `config set` plugin; chờ hoặc giảm tải (stop bot phụ/Nemo).
+> - Restart 9.6 lúc CPU yếu có thể mất 5–12 phút tới `ready`; exit 78 phải `reset-failed` + `start` tay.
+> - Fallback model không cứu được khi nghẽn nằm ở worker cục bộ (mọi candidate cùng `worker task timed out`).
+> - Mỗi lần script gọi CLI 9.6 (`openclaw message send/agent`) mở state DB + tranh lease với gateway → rất chậm khi CPU yếu.
+
+### [2026-09-25] 💥 Khôi phục whisper local sau upgrade 9.6 → hungreo OOM crash-loop 14 lần, bot im ~30 phút
+
+**Loại:** upgrade | oom | whisper | restart-replay | cause-by-own-recommendation
+**Discovered by:** Hưng ("nhắn không thấy trả lời") → Claude Code (Opus 5.5). Chính Claude Code đề xuất khôi phục whisper chiều cùng ngày.
+
+**Chuỗi nhân quả (VERIFIED, log 5 vòng giống hệt):** voice note → `tools.media.models` CLI `whisper --model turbo` → cgroup hungreo peak **5.5G** (gateway 9.6 ~1.2–1.7G + whisper turbo CPU) trên VPS 7.8G → kernel OOM giết whisper → systemd `OOMPolicy=stop` giết **cả service** → restart → 9.6 **replay tin chưa xử lý** (restart recovery) → whisper lại → OOM. Lặp mỗi 4–8 phút, `NRestarts=14`, mỗi lần start mất ~4 phút tới `ready`.
+
+**Vì sao trước upgrade không sao:** gateway 7.1-2 ~480MB → whisper turbo vừa RAM. 9.6 gấp ~2.5× RSS. **Upgrade thay đổi ngân sách RAM ⇒ mọi tác vụ con nặng (whisper/torch) phải tính lại.**
+
+**Chặn:** `tools.media.audio.enabled=false` (hot-reload, không đụng key model → không bị hook chặn) — reload chỉ áp dụng khi turn đang chạy kết thúc (20:18 → 20:20:51). Sau đó 0 OOM.
+
+**Rule rút ra:**
+
+> - Trước khi bật lại tác vụ nặng sau upgrade: đo RSS gateway mới + peak của tác vụ, so với RAM trống **cả VPS** (2 bot + Hermes + n8n). Không đủ biên → model nhỏ hơn (`small`/`base`) hoặc provider cloud, hoặc giới hạn `MemoryMax` riêng cho tác vụ.
+> - 9.5+ replay tin sau restart: một tin "độc" (gây crash) sẽ thành **crash-loop**. Khi thấy `NRestarts` tăng đều → tìm tin inbound ngay trước mỗi lần chết.
+> - `pgrep -f <pattern>` trong shell SSH khớp chính lệnh của mình → dùng `cgroup.procs` của service để đếm process con (bẫy đã dính: báo "whisper running" giả 8 lần).
+> - Đề xuất của mình cũng phải có test tải thật trước khi báo "xong" — "config hot reload applied" ≠ chạy được.
+
+### [2026-09-21] 🛡️ Hook guardrails: 28/28 unit test PASS vẫn lọt 12 lớp lệnh thật — "test mình tự viết" không phải bằng chứng
+
+**Loại:** claude-code | guardrails | test-design | review | alignment
+**Discovered by:** sub-agent review fresh-context (Opus 5) sau khi tác giả (Claude Code) tự test PASS.
+
+**Chuyện gì:** Viết `tools/claude-code-guardrails/guardrails.sh` (PreToolUse hook chặn push/restart bot/đổi config) theo mẫu `mattpocock/skills`. Tự viết 28 ca test → 28/28 PASS → suýt báo "done". Sub-agent review chạy ~200 input thật: lọt `ssh vps 'git push'` (boundary chỉ nhận space), `git -C dir push --force` (regex đòi `git push` liền), toàn bộ `openclaw models set/fallbacks/auth` (chỉ bắt `config set`), `cp /tmp/x openclaw.json` (chỉ bắt sed/tee/>), `git push origin +main`/`-uf`/`--mirror`; false positive `scp` khớp `cp`, `models auth list` bị DENY; `install.sh` báo "đã cài" dù jq fail (lệnh trong list `&&` không kích `set -e`); `deploy.sh --rollback` verify **thư mục backup** thay vì file live vừa cp.
+
+**Vì sao lọt:** test do chính người viết regex nghĩ ra → chỉ test những shape mình đã hình dung khi viết regex. Đúng bệnh "tự tin thay kiểm chứng" (Alignment #5), ở dạng test.
+
+**Rule rút ra:**
+
+> - Guardrail/regex/policy: **bắt buộc 1 vòng review fresh-context với input thật từ runbook** (lấy lệnh trong `kb/openclaw-upgrade-runbook.md`, `SKILL.md`, handover — đó là shape Claude sẽ gõ thật) trước khi coi là lớp bảo vệ.
+> - Boundary sau subcommand: `([^[:alnum:]_-]|$)` chứ không phải `[[:space:]]` — lệnh trong `ssh '...'`, `bash -c "..."`, `(…)`, `…|cat` đều kết thúc bằng ký tự khác space.
+> - Rollback phải verify **đích** (`cmp backup live`), không verify nguồn. Script `set -e` + lệnh trong `a && b` → lỗi của `a` không dừng script; viết `a || exit`.
+> - Hook chỉ chống lỡ tay; ghi rõ giới hạn trong header để người sau không tin quá.
+
+**Ghi chú thêm cùng ngày:** classifier auto-mode chặn Claude tự ghi `~/.claude/hooks` (Self-Modification) và tự scp lên VPS (Modify Shared Resources) → đúng ý Alignment #2/#3: **đóng gói thành script + file patched trong repo, Hưng chạy** — không lách. Bảng version trong `CLAUDE.md` đã stale 2 lần (6.11 khi VPS chạy 7.1-2; deepseek khi thật là OpenRouter) → xác nhận nguyên tắc `writing-for-agents`: không cache thứ environment trả lời được.
+
 ---
 
 ### [2026-09-20] 📊 Báo cáo "Jev tiết kiệm $0.13" — model thật, số gần đúng, KẾT LUẬN sai: cherry-pick baseline + tính tiền cho thứ chạy $0

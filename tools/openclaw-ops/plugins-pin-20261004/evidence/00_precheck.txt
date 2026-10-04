@@ -1,0 +1,35 @@
+Sun Oct  4 20:31:51 +07 2026
+== services
+hungreo active pid=1559593 since=Sat 2026-10-03 20:29:36 +07
+suckhoe active pid=1514236 since=Sat 2026-10-03 15:18:11 +07
+active
+/dev/sda1        96G   71G   25G  75% /
+== config sha + key fields
+2b0ed583c11c332e
+{"p":"hungreo","primary":"openai/gpt-6-sol","fb":["openrouter/meta/muse-spark-1.3-contributor"],"timeout":600}
+eabf0281b95d10e4
+{"p":"suckhoe","primary":"openai/gpt-6-sol","fb":["openrouter/meta/muse-spark-1.3-contributor"],"timeout":180}
+== plugin versions (global origin)
+hungreo {'brave': '2026.9.6', 'codex': '2026.9.8', 'deepseek': '2026.9.6', 'lossless-claw': '1.1.0', 'parallel': '2026.9.6', 'typesafe': '2026.9.6', 'hungreo-finance': '0.1.0'}
+suckhoe {'brave': '2026.9.6', 'codex': '2026.9.8', 'deepseek': '2026.9.6', 'lossless-claw': '1.1.0', 'suckhoe-family-memory': '0.1.0', 'suckhoe-kb-weekly': '0.1.0', 'suckhoe-technical-handoff': '0.1.0'}
+== suckhoe auth (no tokens)
+Agent: main
+Auth state store: ~/.openclaw-suckhoe/state/openclaw.sqlite
+Profiles:
+- anthropic:manual [anthropic/token]
+- openai:<REDACTED_EMAIL> (<REDACTED_EMAIL>) [openai/oauth; expires 1970-01-01T00:00:00.001Z]
+- openai:default (<REDACTED_EMAIL>) [openai/oauth; expires 1970-01-01T00:00:00.001Z]
+- openai:<REDACTED_EMAIL> (<REDACTED_EMAIL>) [openai/oauth; expires 2026-10-05T01:44:26.473Z; cooldown:auth until 2026-10-04T08:39:15.183Z] — Re-authenticate with `openclaw --profile suckhoe models auth login --provider openai --profile-id 'openai:<REDACTED_EMAIL>'`.
+== suckhoe 403 occurrences today
+      4 Oct 04 06:00:29 
+      4 Oct 04 06:29:23 
+      4 Oct 04 15:36:05 
+      4 Oct 04 15:38:45 
+== suckhoe memory index
+Provider: openai-compatible (requested: openai-compatible)
+Indexed: 101/101 files · 307 chunks
+Dirty: no
+  memory · 101/101 files · 307 chunks · 4.0 MiB text + embeddings
+Vector store: indexed (unprobed)
+Vector dims: 1536
+Dreaming artifacts: diary present · 10 corpus files · ingestion state present
