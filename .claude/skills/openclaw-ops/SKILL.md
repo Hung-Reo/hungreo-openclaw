@@ -45,6 +45,7 @@ Nguyên tắc: **Simple · Safe · Effective** + **PLAN → DO → CHECK → REV
 ```bash
 ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -i ~/.ssh/hostinger_kvm2 hung@72.61.123.33
 ```
+
 CLI gateway probe phải set CẢ `OPENCLAW_STATE_DIR=~/.openclaw-<profile>` + `--profile <profile>` (token/port per-profile — lesson 2026-05-29). Binary: `~/.npm-global/bin/openclaw`.
 
 ## 3. Health-check nhanh (read-only, safe — chạy đầu mỗi session)
@@ -57,9 +58,23 @@ for s in hungreo suckhoe nemotron; do
 done
 # Config: primary + fallback + streaming (3 profiles)
 for p in hungreo suckhoe nemotron; do jq -c "{p:\"$p\",primary:.agents.defaults.model.primary,fb:.agents.defaults.model.fallbacks,stream:.channels.telegram.streaming.mode}" ~/.openclaw-$p/openclaw.json; done
+# Env key: tên biến trong gateway.systemd.env phải có trong env gateway; SECRETS_DEGRADED phải = 0 (chỉ đếm tên, không in giá trị)
+for s in hungreo suckhoe; do
+  PID=$(systemctl --user show openclaw-gateway-$s.service --property=MainPID --value); F=~/.openclaw-$s/gateway.systemd.env
+  miss=$(for v in $(cut -d= -f1 $F); do strings /proc/$PID/environ | grep -q "^$v=" || echo -n "$v "; done)
+  since=$(systemctl --user show openclaw-gateway-$s.service -p ActiveEnterTimestamp --value | awk '{print $2" "$3}')  # chỉ process hiện tại
+  echo "$s: env_missing=[${miss}] degraded=$(journalctl --user -u openclaw-gateway-$s.service --since "$since" --no-pager | grep -cE 'SECRETS_(DEGRADED|OWNER_UNAVAILABLE)')"
+done
 # npm latest
 npm view openclaw version; npm view @martian-engineering/lossless-claw version
 ```
+
+## 3b. Điều tra sự cố — trước khi kết luận (thêm 2026-09-21)
+
+1. **Red loop trước, giả thuyết sau.** Có 1 lệnh tái hiện đúng symptom Hưng mô tả (grep log theo mốc giờ, `journalctl --since`, probe read-only) _đã chạy ít nhất 1 lần_ — chưa có thì chưa được đưa giả thuyết.
+2. **3–5 giả thuyết falsifiable**, mỗi cái kèm dự đoán _"nếu X là nguyên nhân thì Y sẽ ..."_ — **show Hưng danh sách xếp hạng TRƯỚC khi test**. Không có dự đoán = vibe, bỏ.
+3. **Kiểm chứng bên ngoài** trước khi chốt: issue tracker upstream, changelog đúng version, backup theo mốc thời gian. Lesson [2026-09-15]: 3 lần kết luận sai về Hermes trước khi tra issue #109727.
+4. **Ca test có side-effect trên production → không ra lệnh cho bot.** Hỏi kiểu _"em sẽ xử lý thế nào? trả lời như em sẽ nhắn"_, hoặc snapshot + lệnh revert viết sẵn trước khi gửi. Lesson [2026-09-15]: bot đổi model thật trong 3 phút.
 
 ## 4. Sessions drift detection (generalized — chạy sau mọi restart)
 
@@ -71,28 +86,41 @@ for p in hungreo suckhoe nemotron; do
   [ -z "$D" ] && echo "$p: ✅ no drift (primary=$PRIM)" || echo "$p: ⚠️$D"
 done
 ```
+
 Nếu có drift → stop service → backup sessions.json → xóa các field override của session đó → start → verify.
 
 ## 5. Upgrade SOP (stop-first) — tóm tắt
 
 > Đầy đủ: `kb/openclaw-upgrade-runbook.md`. Phải có PLAN với Risk + Cost trước.
 
-1. **Backup**: `openclaw.json` ×3 (suffix `pre-upgrade-<VER>`) + `override.conf` hungreo/suckhoe + nemotron `.service` file.
-2. **STOP cả 3**: `systemctl --user stop openclaw-gateway-{hungreo,suckhoe,nemotron}.service` → confirm không còn gateway process.
+1. **Backup**: `openclaw.json` ×3 (suffix `pre-upgrade-<VER>`) + auth `openclaw-agent.sqlite` (hungreo/suckhoe) + `sessions.json` + `override.conf` hungreo/suckhoe + nemotron `.service` file.
+   1b. **⚠️ STOP `openclaw-healthcheck.timer` TRƯỚC** (`systemctl --user stop openclaw-healthcheck.timer` + `stop openclaw-healthcheck.service`). Timer này chạy mỗi 30' và `systemctl restart` mọi gateway down → nếu không tắt, nó tự bật service lại GIỮA lúc update = silent fallback đốt tiền (gotcha [2026-06-14]). Backup/restore-check timer KHÔNG cần tắt (không restart gateway). **Nhớ `start` lại sau khi restart xong cả 3.**
+2. **STOP cả 3**: `systemctl --user stop openclaw-gateway-{hungreo,suckhoe,nemotron}.service` → đợi ~6s → confirm `pgrep -af "dist/index.js gateway"` rỗng (không còn process tự bật lại).
 3. **Update từng profile**: `OPENCLAW_STATE_DIR=~/.openclaw-<p> ~/.npm-global/bin/openclaw update --yes --no-restart` (chạy `openclaw doctor` tự động — đây là chỗ auto-migrate).
-4. **DIFF config** vs backup: verify `model.primary` không bị migrate. Restore `openai-codex/gpt-5.5` nếu lệch → `openclaw --profile <p> config validate`.
-5. **Verify** lossless-claw version + `@earendil-works` deps (0.11.x native, không cần symlink `@mariozechner` nữa).
+4. **DIFF config** vs backup: verify model config không bị đổi ngoài ý muốn. Với 6.1+, form đúng là `model.primary="openai/gpt-5.5"` + `models["openai/gpt-5.5"].agentRuntime.id="codex"`; KHÔNG restore về `openai-codex/gpt-5.5`.
+5. **Verify** lossless-claw live version theo target đã duyệt; 0.13.x không cần symlink `@mariozechner`.
 6. **Bump version** trong `override.conf`/service file (`sed 's/<OLD>/<NEW>/g'`) → `systemctl --user daemon-reload`.
-7. **Restart** (KHÔNG `start`) theo thứ tự suckhoe → hungreo → nemotron, chờ `http server listening` từng cái.
+7. **Restart** (KHÔNG `start`) theo thứ tự suckhoe → hungreo → nemotron, chờ log `[gateway] ready` từng cái. **Xong cả 3 → `systemctl --user start openclaw-healthcheck.timer`** (bật lại auto-recovery đã tắt ở bước 1b).
 8. **CHECK 3 tầng**:
    - (a) Gateway log: plugins đủ (`lossless-claw` có mặt) + `env_VER` đúng + 0 `Cannot find module`.
    - (a2) ⚠️ **RE-DIFF model.primary SAU restart** (6.1 migrate lúc gateway START → DIFF-sau-update false-negative). **6.1+:** form đúng là `openai/gpt-5.5`+`agentRuntime:{id:codex}` → GIỮ, đừng restore `openai-codex/`. Verify winner=`openai/gpt-5.5` fallbackUsed=false cost=$0. Nếu winner=deepseek + log 401 codex → auth hỏng (re-auth). Lesson [2026-06-04].
+   - (a3) **Auth (6.5+):** `models auth list` TỪNG profile hungreo+suckhoe → token codex exp còn sống + `Profiles:` populated (KHÔNG `(none)`). Nếu `(none)` → stop → `doctor --fix` (Migrated auth JSON→SQLite, không cần device-code — Addendum 8).
+   - (a4) **Env key (lesson [2026-10-06]):** upgrade 9.8 viết lại `override.conf` Hungreo và làm mất `EnvironmentFile` → 6 key (OpenRouter fallback, TypeSafe, Brave…) biến mất 3 ngày trong khi `active` + UAT_OK vẫn PASS. Sau restart: chạy khối "Env key" ở mục 3 → `env_missing=[]` và `degraded=0` cho từng profile; diff cả thư mục `…service.d/` trước/sau upgrade. Hungreo giữ dòng này trong drop-in riêng `zzzz-envfile.conf`.
    - (b) `sessions.json` drift = 0 (mục 4).
-   - (c) UAT: `OPENCLAW_STATE_DIR=~/.openclaw-hungreo openclaw --profile hungreo agent --json --timeout 180 --session-id uat-<VER> --message "Use exec to run: printf tool-ok. Then reply exactly FINAL_ONLY_OK."` → expect gateway log `agent model: openai-codex/gpt-5.5`, toolSummary 1/0, payload `FINAL_ONLY_OK`.
+   - (c) UAT: `OPENCLAW_STATE_DIR=~/.openclaw-<p> openclaw --profile <p> agent --json --timeout 150 --session-id uat-<VER> --message "Reply with exactly UAT_OK and nothing else."`. Parse JSON: `result.meta.executionTrace.winnerProvider`+`winnerModel` (expect `openai/gpt-5.5`), `result.meta.executionTrace.attempts|length` (==1 ⇒ no fallback, $0), `result.payloads[0].text`. (KHÔNG có field `fallbackUsed` boolean — suy từ attempts. agentRuntime ở `agents.defaults.models[primary].agentRuntime.id`.)
+     8b. 🧹 **DỌN SAU UPGRADE (bắt buộc, chỉ chạy SAU khi verify bản mới ổn)** — không làm thì mỗi upgrade cộng ~1.4G/profile + 2-4G backup vĩnh viễn:
+   - **Orphan plugin dir:** so `plugins list --json | .rootDir` với thư mục thật trong `npm/projects/`, xoá cái không active. ⚠️ CHỈ xoá khi có bản mới hơn **cùng plugin id** đang active — plugin `disabled nhưng còn cấu hình` (vd `perplexity` ở nemotron) cũng hiện "orphan" nhưng KHÔNG được xoá. Snippet đầy đủ: runbook mục "🧹 Bước DỌN sau upgrade".
+   - **Backup upgrade cũ:** `~/bin/openclaw-prune-upgrade-backups.sh` (dry-run) → `--yes` (giữ 2 bản mới nhất mỗi họ `openclaw-upgrade-*` / `lcm-*upgrade-*`).
+   - Backup daily (`openclaw-backup.sh`) đã exclude `npm/` từ 2026-07-28 + `RETENTION_KEEP=2`. Khi restore phải chạy `openclaw update` dựng lại `npm/` trước khi start gateway (có `RESTORE-NOTE.txt` trong mỗi backup).
 9. **REPORT** + update `SESSION_HANDOVER.md` + `kb/lessons-learned.md`. Phải có section **"What could still be wrong"** — không tô vẽ. Liệt kê backup + rollback path.
 
 ## 6. Patches / gotchas hiện tại (cập nhật khi đổi)
 
+- **Telegram format (native since 6.9, confirmed on 6.11):**
+  - Old `telegram-plain-text` patcher/drop-in was retired because upstream removed the rich-message path that caused the small-font regression.
+  - Do NOT re-enable `telegram-plain-text.conf` or expect `operation=sendMessagePlain` unless a future incident explicitly restores that patcher.
+  - After upgrade: UAT 1 DM + 1 topic, Hưng eyeball visual format, and grep logs for native `operation=sendMessage` with no `sendRichMessage` / `rich_message` regression.
+  - Không dùng lại global-fetch preload; OpenClaw 2026.6.8 dùng imported `undici.fetch`, preload không chạm production.
 - Patch 1 + Patch 2 (`!embedded && messageTool`) + symlink `@mariozechner→@earendil-works`: **OBSOLETE** từ 5.18 + lossless 0.11.1. Không re-apply.
 - Auto-migrate `openai-codex/`→`openai/`: **vẫn recurring tới 5.28** (5.27 thêm shape `agentRuntime:{id:codex}`). DIFF bắt buộc mỗi upgrade.
 - **Breaking schema (5.28):** bỏ legacy `agents.defaults.embeddedPi` → đổi tên `embeddedAgent`. nemotron crash startup `agents.defaults: Invalid input`. Nếu profile nào `failed` sau restart với lỗi này → **so keys `agents.defaults` giữa 3 profiles** tìm key legacy → rename giữ value (KHÔNG `doctor --fix` mù). Lesson [2026-06-03].

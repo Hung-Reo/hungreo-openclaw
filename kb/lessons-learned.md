@@ -6,6 +6,22 @@
 
 ---
 
+### [2026-10-06] Upgrade ghi lại unit systemd làm mất EnvironmentFile → bot mất 6 key 3 ngày, không ai thấy
+
+**Loại:** upgrade | systemd | env | secrets-degraded | silent-capability-loss
+
+**VERIFIED:** upgrade 9.8 (03/10 15:39) viết lại `override.conf` của Hungreo, bỏ `EnvironmentFile=-…/gateway.systemd.env`. Gateway vẫn `active`, Sol vẫn trả lời, UAT `UAT_OK` PASS → không phép kiểm nào bắt được; chỉ log `SECRETS_DEGRADED` (từ 15:39) cho thấy OpenRouter fallback, TypeSafe, Brave, DeepSeek, Apify, Telegram key đã mất. Hưng cảm nhận "Rùa thiếu thiếu" 3 ngày trước khi tìm ra.
+
+**Rule:**
+
+> - Sau mọi upgrade/restart: so tên biến trong `gateway.systemd.env` với `/proc/<pid>/environ` của gateway (chỉ đếm tên) và `journalctl … | grep -c SECRETS_DEGRADED` phải = 0. UAT_OK + `active` KHÔNG đủ.
+> - Diff toàn bộ thư mục `…service.d/` trước/sau upgrade, không chỉ dòng `OPENCLAW_SERVICE_VERSION`.
+> - CLI chạy tay (vd `memory index`) không có env của gateway; nạp `set -a; . gateway.systemd.env; set +a` khi lệnh cần resolve secret.
+
+Chi tiết: `SESSION_HANDOVER.md` entry 2026-10-06 13:45.
+
+---
+
 ### [2026-10-04] Bot "không tự action được" = mỗi lượt bị cắt ở 180s, không phải mất năng lực
 
 **Loại:** timeout | execution-budget | codex-app-server | multi-step-task | config
