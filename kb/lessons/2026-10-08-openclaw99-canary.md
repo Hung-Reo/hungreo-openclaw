@@ -1,0 +1,14 @@
+# 08/10/2026 — OpenClaw 9.9: retained ledger, peer links, secrets and real tool output
+
+Tags: upgrade, production, codex, pending-migration, host-peer-link, stop-first, backup, auth, model-selection.
+
+VERIFIED Production canary Hungreo 9.9 / native Codex 0.160.0, primary kept Sol 6. Evidence: `live-vps-snapshot/2026-10-08-openclaw-99-sol61-plan/PRODUCTION-REPORT.md`.
+
+- A rehearsal which deletes/rebuilds `plugins.installedIndex` does not exercise an update using the original live ledger. Preserve that path in a second rehearsal: an already-complete Codex migration receipt blocked installation despite zero remaining data plans. Resolve only via upstream maintenance/owner APIs after inspecting both phases; never delete pending rows to bypass admission. Refuse actual data repair without a separately reviewed plan.
+- A parallel core prefix changes the expected **host package identity**, even when older plugin versions have compatible SDK contracts. Ready HTTP can coexist with quarantined Lossless/Brave/etc. Audit host links before boot; use upstream managed npm repair on the intended profile's roots, retain versions/settings, refresh the registry and verify runtime load. Rollback must restore peer links as well as service executable/index. Never hand-edit installed source or symlinks.
+- SQLite connection context managers commit/rollback transactions but do not close the connection. Close the preflight connection before checking surviving file owners in a stop-first backup; otherwise the guard detects its own PID. On failure, restore the prior service/timer state.
+- Exit 0, toolSummary failures=0 and a successful model receipt do not prove the agent saw tool data. Assert exact fixture output. In the first Sol 6 test, the orchestration printed only `result.content`, but the tool's returned value had another shape; output was empty. Emitting the complete value made a fresh run pass. Report the failed first gate rather than counting it as success.
+- An `agent exec --config` ephemeral run did not carry usable explicit canonical auth order in this setup. Do not relogin or change Production auth based on that result. A private state/auth clone with a fresh local turn called 6.1 successfully; label it clone evidence, not a Telegram Production 6.1 turn.
+- Compare all authored config and EnvFile key names, verify exact native process version and actual winner/fallback, and keep long-term memory/OOM/UAT separate from startup PASS. Registration, session selection and shared default are three distinct actions; `/model -s` is the trial, `-g` affects unpinned future turns, existing pins remain.
+
+Existing dirty/untracked handover and lessons index files were preserved. This standalone lesson is additive; it can be integrated into the shared index by its owner when that WIP is ready.
