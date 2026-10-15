@@ -1,0 +1,81 @@
+== now 2026-10-15 12:08:47
+Mem:            7940        5932         519           0        1788        2008
+Swap:           2047        2039           8
+
+################ suckhoe
+gateway=active pid=3456950 since=Sun 2026-10-11 14:27:51 +07
+-- config LCM
+{"slot":"lossless-claw","lcm":{"enabled":true,"config":{"dbPath":"/home/hung/.openclaw-suckhoe/lcm.db","contextThreshold":0.75,"freshTailCount":32},"hooks":{"allowConversationAccess":true}},"allow":["lossless-claw"]}
+-- package
+-- installed index (sqlite ro)
+  config_machine_state.value_json: …1c88f3caa761f0f58e3139118c7b763dedb","resolvedAt":"2026-10-04T13:45:14.101Z","installedAt":"2026-10-04T13:45:15.611Z"},"lossless-claw":{"source":"npm","spec":"@martian-engineering/lossless-claw@1.1.0","installPath":"/home/hung/.openclaw-suckhoe/npm/projects/martian-engineering-lossless-claw-fde018f0ba__openclaw-generation__g-5da657500c74220e/node_modules/@martian-engineering/lo…
+-- lcm.db
+-rw------- 1 hung hung <ID> 2026-10-13_06:29:35 /home/hung/.openclaw-suckhoe/lcm.db
+-rw------- 1 hung hung    32768 2026-10-15_06:29:32 /home/hung/.openclaw-suckhoe/lcm.db-shm
+-rw------- 1 hung hung  4305432 2026-10-15_06:29:32 /home/hung/.openclaw-suckhoe/lcm.db-wal
+  quick_check: ok
+  conversations: 697
+  messages: 11117
+  summaries: 65
+  pending_summary_nodes: 11
+  pending_summary_nodes cols: ['ordinal_start', 'ordinal_end']
+-- cron/automations (để chọn giờ restart)
+ID                                   Declaration              Name                     Schedule                         Next       Last       Status              Target    Delivery                                                         Agent ID   Owner                    Model               
+882b50b9-be95-44ad-b6bf-3145c741b91f heartbeat:main           Heartbeat (main)         every 1h                         in 41m     19m ago    skipped             main      not requested (not requested)                                    main       -                        -
+3eeb73eb-eee3-473a-b233-3d3eb8f72561 -                        Nhắc uống thuốc 19:30... cron 30 19 * * * @ Asia/Ho_Ch... in 7h      17h ago    ok                  isolated  not requested (not requested)                                    main       -                        -
+24d69584-2b6c-4c03-9c6d-f8a43864c24c memory-core:memory-dr... Memory Dreaming Promo... cron 0 3 * * * (exact)           in 15h     9h ago     ok                  isolated  not requested (not requested)                                    main       -                        -
+2d12fbed-bbcd-40ca-ba23-abd8b2dc2560 devotional-oneway-aud... Tĩnh nguyện: chép lời... cron 10,40 4 * * * @ Asia/Ho_... in 16h     7h ago     ok                  isolated  not requested (not requested)                                    main       -                        -
+9cc2d15e-d3cd-42c8-87bd-cd1cba3d373c -                        Tĩnh nguyện sáng 5:45am  cron 45 5 * * * @ Asia/Ho_Chi... in 18h     6h ago     ok                  isolated  not requested (not requested)                                    main       -                        -
+f296927a-2b6e-428c-b7b6-cf2806a30585 suckhoe-devotional-ca... Tĩnh nguyện catch-up ... cron 0,20,45 6 * * * @ Asia/H... in 18h     5h ago     ok                  isolated  not requested (not requested)                                    main       -                        -
+691e12e2-21bd-48ec-9a1b-a92624f69c94 -                        Chào Ngày Mới - Minh ... cron 15 6 * * * @ Asia/Ho_Chi... in 18h     6h ago     ok                  isolated  not requested (not requested)                                    main       -                        -
+bsy-daily-report-0615                -                        Báo cáo tương tác Bsy... cron 15 6 * * * @ Asia/Ho_Chi... in 18h     6h ago     ok                  isolated  not requested (not requested)                                    main       -                        -
+bsy-brief-pipeline-0628              -                        Bsy Morning Brief Pip... cron 28 6 * * * @ Asia/Ho_Chi... in 18h     6h ago     ok                  isolated  not requested (not requested)                                    main       -                        -
+78c05221-6cf5-4a20-b0f2-ad24ca60fe54 -                        bsy-brief-catchup-sen... cron 50 6 * * * @ Asia/Ho_Chi... in 19h     5h ago     ok                  isolated  not requested (not requested)                                    main       -                        -
+9e7a6af2-262d-47e1-8133-2762d4a5ea1a skill-collection-revi... Skill collection revi... every 7d                         in 2d      5d ago     ok                  isolated  not requested (not requested)                                    main       -                        -
+5a2ec168-3f9a-4953-b714-8f1d46ad8931 -                        Nhắc refill thuốc Hưn... cron 0 9 25,26 * * @ Asia/Ho_... in 10d     19d ago    ok                  isolated  not requested (not requested)                                    main       -                        -
+-- DRY-RUN plugins update @martian-engineering/lossless-claw@1.1.1
+Would update lossless-claw: 1.1.0 -> 1.1.1.
+dry-run rc=0
+-- config hash sau dry-run (phải trùng trước): 786032d2
+-- package sau dry-run: 
+
+################ hungreo
+gateway=active pid=3242117 since=Sat 2026-10-10 19:26:39 +07
+-- config LCM
+{"slot":"lossless-claw","lcm":{"enabled":true,"config":{"dbPath":"/home/hung/.openclaw-hungreo/lcm.db","contextThreshold":0.75,"freshTailCount":32},"hooks":{"allowConversationAccess":true}},"allow":["lossless-claw"]}
+-- package
+-- installed index (sqlite ro)
+  config_machine_state.value_json: …1c88f3caa761f0f58e3139118c7b763dedb","resolvedAt":"2026-10-04T13:44:51.624Z","installedAt":"2026-10-04T13:44:53.847Z"},"lossless-claw":{"source":"npm","spec":"@martian-engineering/lossless-claw@1.1.0","installPath":"/home/hung/.openclaw-hungreo/npm/projects/martian-engineering-lossless-claw-fde018f0ba__openclaw-generation__g-5da657500c74220e/node_modules/@martian-engineering/lo…
+-- lcm.db
+-rw------- 1 hung hung <ID> 2026-10-15_11:37:18 /home/hung/.openclaw-hungreo/lcm.db
+-rw------- 1 hung hung     32768 2026-10-15_12:03:42 /home/hung/.openclaw-hungreo/lcm.db-shm
+-rw------- 1 hung hung   8874512 2026-10-15_12:03:42 /home/hung/.openclaw-hungreo/lcm.db-wal
+  quick_check: ok
+  conversations: 2079
+  messages: 47758
+  summaries: 839
+  pending_summary_nodes: 152
+  pending_summary_nodes cols: ['ordinal_start', 'ordinal_end']
+-- cron/automations (để chọn giờ restart)
+ID                                   Declaration              Name                     Schedule                         Next       Last       Status              Target    Delivery                                                         Agent ID   Owner                    Model               
+c2a6104a-1076-4578-8225-ec7fa66b9cbc heartbeat:main           Heartbeat (main)         every 2h                         in 24m     2h ago     ok                  main      not requested (not requested)                                    main       -                        -
+f1ab6747-6da1-4757-84ab-ccc0e2a276e3 -                        openclaw-stable-dm-watch every 3h                         in 3h      11m ago    ok                  isolated  not requested (not requested)                                    main       -                        -
+71c94314-2184-493a-b12b-a8bf45edbfe7 -                        Calendar reminder: MB... at 2026-10-15 09:45Z             in 5h      -          idle                isolated  not requested (not requested)                                    main       -                        -
+2e6ae2c0-5b4c-4a10-83d0-6baa3316ab77 memory-core:memory-dr... Memory Dreaming Promo... cron 0 3 * * * (exact)           in 15h     9h ago     ok                  isolated  not requested (not requested)                                    main       -                        -
+743fd894-4627-4c3e-b9e3-d0059833e2d0 -                        Daily calendar remind... cron 0 6 * * * @ Asia/Ho_Chi_... in 18h     6h ago     ok                  isolated  none -> telegram:<ID> (explicit)                           main       -                        -
+848ead51-2613-4c3d-af4b-cf0b21fc6049 -                        hungreo-finance-compl... cron 0 7 * * * @ Asia/Ho_Chi_... in 19h     5h ago     ok                  isolated  none -> telegram:-<ID>:topic:61 (explicit)              main       -                        -
+openclaw-version-check-daily         -                        3 GitHub Reports: Ope... cron 30 5 * * 0,3 @ Asia/Ho_C... in 3d      1d ago     ok                  isolated  announce -> telegram:-<ID>:topic:3 (explicit)           main       -                        openai/gpt-5.6-sol
+39977e55-849f-43c8-9613-2ce8703b28fa skill-collection-revi... Skill collection revi... every 7d                         in 4d      3d ago     ok                  isolated  not requested (not requested)                                    main       -                        -
+d551b269-daa9-4289-ab3a-d33ea038895f -                        Nhắc kiểm tra bình ắc... at 2027-02-04 02:00Z             in 112d    -          idle                isolated  none -> telegram:<ID> (explicit)                           main       -                        -
+3664e843-0bf5-4d13-8a86-f3aad922c437 -                        Nhắc kiểm tra bình ắc... at 2027-03-04 02:00Z             in 140d    -          idle                isolated  none -> telegram:<ID> (explicit)                           main       -                        -
+Fri 2026-10-16 02:05:00 +07       13h Thu 2026-10-15 02:05:47 +07      10h ago hungreo-finance-backup.timer   hungreo-finance-backup.service
+-- DRY-RUN plugins update @martian-engineering/lossless-claw@1.1.1
+Would update lossless-claw: 1.1.0 -> 1.1.1.
+dry-run rc=0
+-- config hash sau dry-run (phải trùng trước): 7e281f81
+-- package sau dry-run: 
+
+== backup dir dự kiến
+  (chưa có)
+/dev/sda1        96G   72G   25G  75% /
+OK 00
