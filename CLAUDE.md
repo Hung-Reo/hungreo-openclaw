@@ -29,18 +29,13 @@ This is Hưng's personal fork of [openclaw/openclaw](https://github.com/openclaw
 - **Log suckhoe:** `journalctl --user -u openclaw-gateway-suckhoe.service -n 30 --no-pager`
 - **Log xfeed:** `journalctl --user -u hungreo-xfeed.service -n 30 --no-pager`
 
-## Versions hiện tại (cập nhật: 2026-07-01)
+## Versions — đọc từ VPS, KHÔNG cache trong file này (đổi 2026-09-21)
 
-| Component            | Version                                                  |
-| -------------------- | -------------------------------------------------------- |
-| openclaw npm/VPS     | 2026.6.11 (stable, latest, tất cả 3)                     |
-| lossless-claw plugin | 0.13.2 (tất cả 3 — native, KHÔNG cần symlink workaround) |
+Bảng version từng nằm ở đây đã stale 2 lần (ghi 2026.6.11 khi VPS chạy 2026.7.1-2; fallback ghi deepseek khi thực tế là OpenRouter) → bỏ. Nguồn sự thật:
 
-Chi tiết upgrade 6.9→6.11 (GATE 1/2, backup, phát hiện mới về runtime auto-enable plugin): `SESSION_HANDOVER.md` entry 2026-07-01 + `kb/lessons-learned.md` entry [2026-07-01].
-
-**Fallbacks (mới 2026-05-21):** hungreo + suckhoe đã đổi fallback từ `anthropic/claude-sonnet-4-6` → `deepseek/deepseek-v4-pro` → safer cost-wise.
-
-**Patch 2 (`!embedded && messageTool`):** ✅ UPSTREAM FIXED trong 2026.5.18 — KHÔNG cần re-apply nữa.
+- **Version đang chạy:** `systemctl --user show -p MainPID --value openclaw-gateway-hungreo.service` → `strings /proc/<PID>/environ | grep OPENCLAW_SERVICE_VERSION`, hoặc `/status` từ Telegram.
+- **Model / fallback hiện hành:** `openclaw.json` từng profile trên VPS là nguồn duy nhất (`jq .agents.defaults.model`). `LOCAL_CONTEXT.md` chỉ đọc entry **mới nhất** (mục "Subagents Model Cutover" 2026-09-11) — các bảng cũ hơn trong file đó (ghi `openai-codex/gpt-5.5`, deepseek) là lịch sử, không phải hiện trạng.
+- **Lịch sử upgrade, patch obsolete:** `SESSION_HANDOVER.md` entry mới nhất + `.claude/skills/openclaw-ops/SKILL.md` mục 6.
 
 ## 🛡️ HARD RULES — Model & Upgrade (NEW 2026-05-08, sau incident Anthropic API leak)
 
@@ -107,41 +102,13 @@ Chi tiết: `kb/lessons-learned.md` entries [2026-05-08], [2026-05-15].
 | 05/09 | Claude Code siết policy quá tay 2 lần liên tiếp                                                  | "An toàn" thay ý chủ     |
 | 15/09 | Claude Code kết luận sai 3 lần về Hermes trước khi tra issue tracker                             | Tự tin thay kiểm chứng   |
 
-**6 luật, theo thứ tự ưu tiên:**
+**6 luật + phép thử:** xem `~/.claude/CLAUDE.md` mục Alignment (nguồn duy nhất, không chép lại ở đây — rút gọn 2026-09-26).
 
-1. **Ý định của Hưng > diễn giải của agent.** Hưng đã mô tả luồng → làm đúng luồng.
-   "Siết cho an toàn" quá tay cũng là làm sai.
-2. **Không đơn phương với thứ không đảo ngược được hoặc tốn tiền:** model / provider /
-   fallback / auth / tools.exec / xoá dữ liệu / gửi tin thay Hưng. Lưỡng lự → hành động
-   thận trọng nhất là **hỏi hoặc dừng**, không phải "làm rồi báo".
-3. **Không bao giờ tự viết luật cho chính mình.** Đề xuất sửa CLAUDE.md / AGENTS.md /
-   SOUL.md → Hưng duyệt → mới ghi. Tự sửa luật = tự cấp phép.
-4. **Trung thực trước, thể diện sau.** Sai → đính chính ngay, nói rõ sai chỗ nào.
-   Chưa biết → "chưa biết". Chưa verify → "đoán". Report bắt buộc có "what could still be wrong".
-5. **Kiểm chứng bên ngoài trước khi kết luận.** Log + code chưa đủ — tra issue tracker,
-   changelog, backup theo mốc thời gian. "Nghe hợp lý" không phải bằng chứng.
-6. **Nhất quán dù có ai xem hay không.** Không làm khác khi nghĩ "việc nhỏ, không ai kiểm".
-   Mọi thay đổi để lại dấu vết: backup có tên, `DELETED-*.txt`, handover.
+## Upgrade
 
-**Phép thử trước mỗi hành động:** _Nếu Hưng đứng sau lưng xem, tôi có làm y hệt không?
-Nếu tôi sai, Hưng phát hiện bằng cách nào — tôi có để dấu vết không?_
+SOP đầy đủ: `kb/openclaw-upgrade-runbook.md` + skill `openclaw-ops` (mục sessions drift, form `openai/` + `agentRuntime` 6.1+). Hai bẫy đã tốn tiền, luôn nhớ:
 
-## Upgrade checklist (tóm tắt — ĐÃ CẬP NHẬT 2026-07-01)
-
-> **Đọc `kb/openclaw-upgrade-runbook.md` để có SOP đầy đủ và các gotchas.** Checklist dưới chỉ là quick ref.
-
-1. `npm view openclaw version` — kiểm latest stable trên npm
-2. `npm view @martian-engineering/lossless-claw version` — kiểm plugin
-3. Backup configs/workspace/auth/sessions/finance/lcm/systemd drop-ins cả 3 profiles
-4. STOP `openclaw-healthcheck.timer`, rồi STOP cả 3 services trước khi update
-5. `OPENCLAW_STATE_DIR=~/.openclaw-<profile> openclaw update --yes --no-restart` — chạy từng profile
-   5b. DIFF backup vs current `openclaw.json`; với 6.1+ giữ form đúng `openai/gpt-5.5` + `agentRuntime.id="codex"`, không restore về `openai-codex/`
-6. Update lossless-claw target version và verify plugin live version cả 3 profiles
-7. ⚠️ **Update `service.d/override.conf`** — đổi `OPENCLAW_SERVICE_VERSION=NEW_VER` → `daemon-reload`
-8. Start: suckhoe → wait ready → hungreo → wait ready → nemotron; bật lại `openclaw-healthcheck.timer` sau khi cả 3 healthy
-9. Verify: `strings /proc/$PID/environ | grep OPENCLAW_SERVICE_VERSION` = `NEW_VER`
-10. Audit `sessions.json` generalized drift — clear auto-pins nếu có
-11. UAT: `/status` từ Telegram báo version mới; model expected hiện là `openai/gpt-5.5` qua `agentRuntime.id="codex"` với attempts=1/no fallback
-12. Telegram format UAT: 1 DM + 1 group/topic; native log `operation=sendMessage`, không có `sendRichMessage` regression
+- ⚠️ STOP `openclaw-healthcheck.timer` rồi STOP cả 3 services **trước** khi update — không update khi LIVE.
+- ⚠️ Update `service.d/override.conf` (`OPENCLAW_SERVICE_VERSION=NEW_VER`) → `daemon-reload`.
 
 > **Note cho mobile:** SSH key cần có ở `~/.ssh/hostinger_kvm2` trên thiết bị. Nếu không có, dùng Termius hoặc SSH app để check thủ công rồi báo lại cho Claude Code.

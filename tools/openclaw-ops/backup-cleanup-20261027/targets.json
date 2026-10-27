@@ -1,0 +1,93 @@
+{
+  "host": "srv1367812",
+  "authorization": "PREPARATION AND AUDIT ONLY; no deletion GO yet; never reuse 18/10 GO",
+  "paths": [
+    "/home/hung/backups/openclaw-hungreo-pre933-20261018-154744",
+    "/home/hung/backups/openclaw-suckhoe-pre933-20261018-154622",
+    "/home/hung/backups/post933-cleanup-hungreo-20261018-164201",
+    "/home/hung/backups/post933-cleanup-suckhoe-20261018-163847"
+  ],
+  "expected_proposal_bytes": 740741120,
+  "remove_stopped_containers": [],
+  "protect_containers": ["nemo-sandbox", "nemo-sandbox-10.4", "n8n", "n8n-caddy"],
+  "keep_backup_sets": [
+    "/home/hung/backups/openclaw/hungreo/20261027-021528",
+    "/home/hung/backups/openclaw-hungreo-pre934-20261026-193928",
+    "/home/hung/backups/lcm-120-hungreo-20261025-142747",
+    "/home/hung/backups/node-24221-hungreo-20261026-160355",
+    "/home/hung/backups/openclaw/suckhoe/20261027-021528",
+    "/home/hung/backups/openclaw-suckhoe-pre934-20261026-192200",
+    "/home/hung/backups/lcm-120-suckhoe-20261025-142410",
+    "/home/hung/backups/node-24221-suckhoe-20261026-160024",
+    "/home/hung/backups/nemo-10.5-20261021-203858",
+    "/home/hung/backups/nemo-lcm120-20261022-062251"
+  ],
+  "runtime_packages": {
+    "hungreo": "/home/hung/openclaw-upgrade-20261026-934/runtime/node_modules/openclaw/package.json",
+    "suckhoe": "/home/hung/openclaw-upgrade-20261026-934/runtime/node_modules/openclaw/package.json",
+    "nemo": "/home/hung/sandbox-nemo/runtime-10.5/node_modules/openclaw/package.json"
+  },
+  "versions": {
+    "hungreo": "2026.9.34",
+    "suckhoe": "2026.9.34",
+    "nemo": "2026.10.5"
+  },
+  "required_backup_members": {
+    "/home/hung/backups/openclaw/hungreo/20261027-021528": ["state.tgz", "sqlite.tgz"],
+    "/home/hung/backups/openclaw-hungreo-pre934-20261026-193928": [
+      "canonical-before.sqlite",
+      "agent-before.sqlite",
+      "lcm-before.db",
+      "npm-projects-before.tgz",
+      "openclaw.json",
+      "peer-records-before.json",
+      "zzzzz-upgrade-99.conf",
+      "openclaw-cli",
+      "openclaw-healthcheck.sh"
+    ],
+    "/home/hung/backups/lcm-120-hungreo-20261025-142747": [
+      "lcm/lcm.db",
+      "lcm/lcm.db-wal",
+      "state/openclaw.sqlite",
+      "state/openclaw.sqlite-wal",
+      "npm-lossless-1.1.1.tgz",
+      "openclaw.json"
+    ],
+    "/home/hung/backups/node-24221-hungreo-20261026-160355": [
+      "canonical-before.sqlite",
+      "openclaw.json",
+      "zzzzz-upgrade-99.conf",
+      "openclaw-cli",
+      "openclaw-healthcheck.sh"
+    ],
+    "/home/hung/backups/openclaw/suckhoe/20261027-021528": ["state.tgz", "sqlite.tgz"],
+    "/home/hung/backups/openclaw-suckhoe-pre934-20261026-192200": [
+      "canonical-before.sqlite",
+      "agent-before.sqlite",
+      "lcm-before.db",
+      "npm-projects-before.tgz",
+      "openclaw.json",
+      "peer-records-before.json",
+      "zzzzz-upgrade-99.conf",
+      "openclaw-cli",
+      "openclaw-healthcheck.sh"
+    ],
+    "/home/hung/backups/lcm-120-suckhoe-20261025-142410": [
+      "lcm/lcm.db",
+      "lcm/lcm.db-wal",
+      "state/openclaw.sqlite",
+      "state/openclaw.sqlite-wal",
+      "npm-lossless-1.1.1.tgz",
+      "openclaw.json"
+    ],
+    "/home/hung/backups/node-24221-suckhoe-20261026-160024": [
+      "canonical-before.sqlite",
+      "openclaw.json",
+      "zzzzz-upgrade-99.conf",
+      "openclaw-cli",
+      "openclaw-healthcheck.sh"
+    ],
+    "/home/hung/backups/nemo-10.5-20261021-203858": ["config.tar", "workspace.tar"],
+    "/home/hung/backups/nemo-lcm120-20261022-062251": ["config.tar", "workspace.tar"]
+  }
+}
