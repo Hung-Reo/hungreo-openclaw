@@ -1,0 +1,37 @@
+# Canonical consumer-health whitelist for Suckhoe KB Weekly.
+# One domain per line. Subdomains are allowed automatically.
+# Policy version: consumer-health-v1
+
+# International (7)
+who.int
+samhsa.gov
+cdc.gov
+nhs.uk
+mayoclinic.org
+nimh.nih.gov
+nice.org.uk
+
+# Vietnam / VN-based (15)
+kcb.vn
+bachmai.gov.vn
+choray.org.vn
+benhvien108.vn
+benhviennhitrunguong.gov.vn
+nhidong.org.vn
+bvndtp.org.vn
+vinmec.com
+fvhospital.com
+medinet.gov.vn
+e-services.moh.gov.vn
+tudu.com.vn
+bvdaihoc.com.vn
+bvbinhdan.com.vn
+yhct.vn
+
+# Đề xuất A — nguồn thuốc, chỉ áp sau GO
+dichvucong.dav.gov.vn
+medlineplus.gov
+dailymed.nlm.nih.gov
+open.fda.gov
+api.fda.gov
+# drugbank.vn chưa thêm: lỗi DNS trong phép kiểm web_fetch.
