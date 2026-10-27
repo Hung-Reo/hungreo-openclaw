@@ -1,0 +1,50 @@
+{
+  "live-muse": {
+    "status": "ok",
+    "winnerModel": "meta/muse-spark-1.3-contributor",
+    "winnerProvider": "openrouter",
+    "attempts": 1,
+    "fallbackUsed": false,
+    "durationMs": 5737
+  },
+  "live-recall-discovery": {
+    "status": "ok",
+    "winnerModel": "meta/muse-spark-1.3-contributor",
+    "winnerProvider": "openrouter",
+    "attempts": 1,
+    "fallbackUsed": false,
+    "durationMs": 15541
+  },
+  "live-sol61": {
+    "status": "ok",
+    "winnerModel": "gpt-6.1-sol",
+    "winnerProvider": "openai",
+    "attempts": 1,
+    "fallbackUsed": false,
+    "durationMs": 8588
+  },
+  "lcm": {
+    "messages": 16,
+    "conversations": 2,
+    "grep_parts": 1,
+    "grep_result_marker_parts": 1
+  },
+  "unaffected_services": {
+    "hungreo": {
+      "MainPID": "3242117",
+      "NRestarts": "0",
+      "ActiveState": "active"
+    },
+    "suckhoe": {
+      "MainPID": "3456950",
+      "NRestarts": "0",
+      "ActiveState": "active"
+    }
+  },
+  "container": {
+    "StartedAt": "2026-10-14T14:26:13.043877584Z",
+    "RestartCount": 0,
+    "OOMKilled": false,
+    "memoryLimitBytes": 2684354560
+  }
+}
