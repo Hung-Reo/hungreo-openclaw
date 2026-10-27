@@ -9,7 +9,12 @@
   ],
   "expected_proposal_bytes": 740741120,
   "remove_stopped_containers": [],
-  "protect_containers": ["nemo-sandbox", "nemo-sandbox-10.4", "n8n", "n8n-caddy"],
+  "protect_containers": [
+    "nemo-sandbox",
+    "nemo-sandbox-10.4",
+    "n8n",
+    "n8n-caddy"
+  ],
   "keep_backup_sets": [
     "/home/hung/backups/openclaw/hungreo/20261027-021528",
     "/home/hung/backups/openclaw-hungreo-pre934-20261026-193928",
@@ -33,7 +38,10 @@
     "nemo": "2026.10.5"
   },
   "required_backup_members": {
-    "/home/hung/backups/openclaw/hungreo/20261027-021528": ["state.tgz", "sqlite.tgz"],
+    "/home/hung/backups/openclaw/hungreo/20261027-021528": [
+      "state.tgz",
+      "sqlite.tgz"
+    ],
     "/home/hung/backups/openclaw-hungreo-pre934-20261026-193928": [
       "canonical-before.sqlite",
       "agent-before.sqlite",
@@ -60,7 +68,10 @@
       "openclaw-cli",
       "openclaw-healthcheck.sh"
     ],
-    "/home/hung/backups/openclaw/suckhoe/20261027-021528": ["state.tgz", "sqlite.tgz"],
+    "/home/hung/backups/openclaw/suckhoe/20261027-021528": [
+      "state.tgz",
+      "sqlite.tgz"
+    ],
     "/home/hung/backups/openclaw-suckhoe-pre934-20261026-192200": [
       "canonical-before.sqlite",
       "agent-before.sqlite",
@@ -87,7 +98,13 @@
       "openclaw-cli",
       "openclaw-healthcheck.sh"
     ],
-    "/home/hung/backups/nemo-10.5-20261021-203858": ["config.tar", "workspace.tar"],
-    "/home/hung/backups/nemo-lcm120-20261022-062251": ["config.tar", "workspace.tar"]
+    "/home/hung/backups/nemo-10.5-20261021-203858": [
+      "config.tar",
+      "workspace.tar"
+    ],
+    "/home/hung/backups/nemo-lcm120-20261022-062251": [
+      "config.tar",
+      "workspace.tar"
+    ]
   }
 }
