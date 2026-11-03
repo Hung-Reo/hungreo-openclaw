@@ -6,6 +6,47 @@
 
 ---
 
+### [2026-11-03] Agent nối vào chat Telegram kế thừa allowlist rộng của repo → cổng duyệt quyền qua DM vô tác dụng
+
+**Loại:** security | telegram | claude-code | codex | permissions | exfiltration
+**Discovered by:** Claude Code (PC, review bộ Mac Collab Hub do Antigravity-Argon dựng)
+**Affects:** Mac của Hưng (phiên Claude/Codex nói chuyện trong group với Rùa, Hermes)
+
+**Root cause (VERIFIED):** launcher chạy `claude` trong repo này nên nạp `.claude/settings.local.json`: 129 allow, có `Read(//Users/hungdinh/**)`, `Bash(ssh -o:*)`, `Bash(ssh -i:*)`, `Bash(python3 -c ' *)`, `Bash(git push *)`, không có deny. Các thao tác đó chạy không cần hỏi, nên prompt duyệt quyền không bao giờ tới DM Hưng. Codex `exec resume` không có `-s`, nên rơi về `sandbox_mode = "workspace-write"` trong `~/.codex/config.toml`. Plugin Telegram bật global trong `~/.claude/settings.json`, nên chạy trong mọi phiên.
+
+**Fix (Argon, 03/11, backup `*.bak-20261103`):** `start-claude-collab.sh` thêm `--setting-sources user --settings collab-settings.json --disallowedTools Bash`; Codex thêm `-c sandbox_mode="read-only"` cho cả `exec`/`resume`, chỉ người thật gọi được, redact secret; plugin global = false. Canary + 14/14 unit test PASS (Argon báo; Claude kiểm lại launcher, settings, 00_check_mac.sh PASS).
+
+**Rule:**
+
+> - Agent nào đọc được tin từ chat (Telegram, group, bot khác) phải chạy với **settings cô lập** (`--setting-sources user` + `--settings` riêng có deny), không kế thừa allowlist của repo nơi nó đứng.
+> - Group chat = kênh injection + kênh rò rỉ: mọi file agent đọc được mà không cần hỏi đều có thể bị dán vào group. Deny `.env`, `~/.ssh`, token dir, dữ liệu cá nhân (vd `kb/medical/`).
+> - Sandbox phải truyền **mỗi lượt**, kể cả lượt resume; không tin rằng lượt sau giữ cờ của lượt đầu.
+> - Còn mở: launcher "mượn" `CLAUDE_CODE_OAUTH_TOKEN` từ env của process Claude Desktop (`ps eww`). Nên thay bằng `claude setup-token` hoặc `/login` riêng cho CLI.
+
+Chi tiết: `SESSION_HANDOVER.md` entry 2026-11-03; `tools/openclaw-ops/mac-collab-hub-20261103/README.md`.
+
+---
+
+### [2026-11-03] Bản tin sáng Hermes gửi tin bịa: guard no-op 8 ngày vì đổi định dạng session id
+
+**Loại:** hermes | cron | silent-capability-loss | provenance | plugin-scope
+**Discovered by:** Hưng (đọc bản tin), Claude Code review
+**Affects:** hermes (job `a8340dc355ff`, bản tin 06:40)
+
+**Root cause (VERIFIED):** từ 26/10 cron dùng session id `local-<sha256>`; plugin `news-format-guard` lọc theo prefix `cron_a8340dc355ff_` nên không chạy, nhưng vẫn "enabled" và không báo lỗi. Ngày 03/11 model chỉ gọi 3 lệnh terminal, 6/9 URL chưa từng được mở, vẫn được gửi. Job pause 09:51 03/11.
+
+**Fix (đang làm, staging, CHƯA cài):** `news-source-gate` (Claude viết, Hermes review). Scope theo `ctx.current_cron_execution()`; receipt chỉ từ `web_extract`; render lại theo grammar cố định; latch `[SILENT]`. Review 3 vòng: v1 và v2 đều CẦN SỬA, mỗi vòng tìm ra bypass thật (header/preamble, link Markdown, timezone). v3 đang chờ Hermes review. Hưng chấp nhận R7 (heuristic ngày) và không làm detector L9.
+
+**Rule:**
+
+> - Plugin/guard phải xác định scope bằng định danh do host cấp (ContextVar), **không** bằng hình dạng id. Sau upgrade, kiểm guard **có chạy thật** (log quyết định), không chỉ "enabled".
+> - `transform_llm_output` của Hermes là fail-open; muốn chặn khi plugin hỏng thì cần latch (`[SILENT]`) để scheduler tự nuốt. Vẫn không phải hard gate.
+> - Test do tác giả tự viết PASS chưa đủ: chạy cùng bộ test với bản cũ (`v1-reference`/`v2-reference`) để chứng minh test mới không xanh giả, và để người khác review độc lập theo hash.
+
+Chi tiết: VPS `~/work/news-source-gate-20261103/` (`impl-v3/REPORT.md`, `review-revision/`); `SESSION_HANDOVER.md` entry 2026-11-03.
+
+---
+
 ### [2026-10-06] Upgrade ghi lại unit systemd làm mất EnvironmentFile → bot mất 6 key 3 ngày, không ai thấy
 
 **Loại:** upgrade | systemd | env | secrets-degraded | silent-capability-loss
