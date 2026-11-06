@@ -13,3 +13,5 @@ Lesson:
 - "Chính thống/official" phải kiểm `tier` trong catalog + repo/maintainer + SHA so với pin, không tin lời agent. Agent không được tự nâng cấp/cài plugin rồi tự restart chính nó (đã có từ 11/10) — giao việc cài cho Claude soạn script, Hưng chạy.
 - Đọc giá trị file trạng thái bằng `cat`, đừng suy từ kích thước.
 - CLI không có --dry-run → rehearsal trên bản sao home + kiểm hash live là bằng chứng không đụng live.
+
+> Cập nhật 06/11/2026: Hưng quyết nâng cấp Hermes do Hermes tự chạy sau GO, xem `2026-11-06-hermes-ask-first-then-act.md`.

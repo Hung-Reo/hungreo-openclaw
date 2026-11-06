@@ -15,3 +15,5 @@ thử bằng lệnh đọc trước. Upgrade agent tự nâng chính nó: không
 
 Quyết định: Hưng hoãn tới v0.22.0 (bản vá bảo mật v0.21.6 không chạm máy này: Dashboard không mở cổng ngoài, Email gateway tắt).
 Backup 4.1G tạo cho lần này đã xoá 12/10 (`storage-cleanup-20261011`) vì không có thay đổi nào cần rollback.
+
+> Cập nhật 06/11/2026: Hưng quyết nâng cấp Hermes do Hermes tự chạy sau GO, xem `2026-11-06-hermes-ask-first-then-act.md`.
