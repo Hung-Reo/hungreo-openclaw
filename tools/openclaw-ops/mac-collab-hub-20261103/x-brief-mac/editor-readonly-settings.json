@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [],
+    "ask": [],
+    "deny": [
+      "read_file(/tmp)",
+      "read_file(/private/tmp)",
+      "read_file(/Users/hungdinh)",
+      "write_file(/Users/hungdinh/Development/hungreo-openclaw)",
+      "write_file(/Users/hungdinh)",
+      "write_file(/tmp)",
+      "write_file(/private/tmp)",
+      "read_file(/Users/hungdinh/.ssh)",
+      "read_file(/Users/hungdinh/.codex)",
+      "read_file(/Users/hungdinh/.gnupg)",
+      "read_file(/Users/hungdinh/.config/gh)",
+      "read_file(/Users/hungdinh/.config/apify)",
+      "read_file(/Users/hungdinh/.claude/channels)",
+      "read_file(/Users/hungdinh/.gemini/channels)",
+      "read_file(/Users/hungdinh/Development/hungreo-openclaw/.env)",
+      "read_file(/Users/hungdinh/Development/hungreo-openclaw/.env.local)",
+      "read_file(/Users/hungdinh/Development/hungreo-openclaw/.env.production)",
+      "command(sh)",
+      "command(bash)",
+      "command(zsh)",
+      "command(rm)",
+      "command(curl)",
+      "command(wget)",
+      "command(ssh)",
+      "command(git)",
+      "command(bun)",
+      "command(node)",
+      "command(python3)"
+    ]
+  }
+}

@@ -1,0 +1,190 @@
+{
+  "enabledPlugins": {
+    "telegram@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "mcp__plugin_telegram_telegram__reply",
+      "mcp__plugin_telegram_telegram__react",
+      "mcp__plugin_telegram_telegram__edit_message",
+      "Edit(~/collab-bot/**)",
+      "Read(~/collab-bot/**)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:registry.npmjs.org)",
+      "WebFetch(domain:code.claude.com)",
+      "WebSearch",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:docs.claude.com)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:docs.openclaw.ai)",
+      "WebFetch(domain:developer.mozilla.org)",
+      "WebFetch(domain:nodejs.org)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:docs.python.org)",
+      "WebFetch(domain:expo.dev)",
+      "WebFetch(domain:docs.expo.dev)",
+      "WebFetch(domain:firebase.google.com)",
+      "WebFetch(domain:reactnative.dev)"
+    ],
+    "ask": [
+      "Edit(//Users/hungdinh/Development/hungreo-openclaw/**)",
+      "Edit(//Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/**)",
+      "Edit(//Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/collab-setup-20261104/**)",
+      "Edit(~/.claude/plugins/**)",
+      "Edit(~/.claude/skills/**)",
+      "Edit(~/.claude/settings*.json)",
+      "Edit(~/.claude/CLAUDE.md)",
+      "Edit(~/.claude/projects/**)",
+      "Edit(**/CLAUDE.md)",
+      "Edit(**/AGENTS.md)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git reset *)",
+      "Bash(git checkout *)",
+      "Bash(git stash *)",
+      "Bash(git clean *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(rsync *)",
+      "Bash(rm *)",
+      "Bash(rmdir *)",
+      "Bash(sudo *)",
+      "Bash(launchctl *)",
+      "Bash(claude *)",
+      "Bash(npm publish *)",
+      "Bash(firebase *)",
+      "Bash(gcloud *)",
+      "Bash(vercel *)",
+      "Bash(eas *)",
+      "Bash(gh pr *)",
+      "Bash(gh api *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(git restore *)",
+      "Bash(git merge *)",
+      "Bash(git rebase *)",
+      "Bash(git config *)",
+      "Bash(git remote *)"
+    ],
+    "deny": [
+      "Read(~/.ssh/**)",
+      "Read(//Users/hungdinh/.ssh/**)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(~/.claude/channels/**)",
+      "Read(//Users/hungdinh/.claude/channels/**)",
+      "Read(~/.codex/**)",
+      "Read(//Users/hungdinh/.codex/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.config/gh/**)",
+      "Edit(~/.ssh/**)",
+      "Edit(~/.claude/channels/**)",
+      "Edit(~/.codex/**)",
+      "Edit(~/.gnupg/**)",
+      "Edit(~/.config/gh/**)",
+      "Edit(**/.env)",
+      "Edit(**/.env.*)",
+      "Bash(env)",
+      "Bash(env *)",
+      "Bash(printenv)",
+      "Bash(printenv *)",
+      "Edit(~/collab-bot/.claude/settings*.json)",
+      "Edit(~/collab-bot/.claude/hooks/**)",
+      "Bash(security *)",
+      "Bash(/usr/bin/security *)",
+      "Edit(//Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/claude-bot-caps-20261112/**)",
+      "Edit(~/collab-bot/inbox/**)"
+    ]
+  },
+  "autoMemoryDirectory": "~/collab-bot/memory",
+  "sandbox": {
+    "enabled": true,
+    "allowUnsandboxedCommands": false,
+    "filesystem": {
+      "allowWrite": [
+        "~/collab-bot"
+      ],
+      "denyRead": [
+        "~/.ssh",
+        "~/.codex",
+        "~/.gnupg",
+        "~/.config/gh",
+        "~/.claude/channels"
+      ],
+      "denyWrite": [
+        "/Users/hungdinh/Development/hungreo-openclaw",
+        "~/.claude",
+        "~/Library/LaunchAgents",
+        "~/.zshrc",
+        "~/.zprofile",
+        "~/.zshenv",
+        "~/collab-bot/.claude/settings.json",
+        "~/collab-bot/.claude/settings.local.json",
+        "/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/claude-bot-caps-20261112"
+      ]
+    },
+    "credentials": {
+      "files": [
+        {
+          "path": "~/.ssh",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.codex",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.gnupg",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.config/gh",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.claude/channels",
+          "mode": "deny"
+        }
+      ],
+      "envVars": [
+        {
+          "name": "CLAUDE_CODE_OAUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "TELEGRAM_BOT_TOKEN",
+          "mode": "deny"
+        }
+      ]
+    },
+    "failIfUnavailable": true,
+    "network": {
+      "allowedDomains": [
+        "github.com",
+        "api.github.com",
+        "codeload.github.com",
+        "objects.githubusercontent.com",
+        "raw.githubusercontent.com",
+        "registry.npmjs.org",
+        "pypi.org",
+        "files.pythonhosted.org"
+      ]
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/hungdinh/.nvm/versions/node/v22.16.0/bin/node' '/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/claude-bot-caps-20261112/owner-gate/owner-gate.mjs' --trust-file '/Users/hungdinh/.claude/channels/telegram-collab/trust.json' --ttl-min 120",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

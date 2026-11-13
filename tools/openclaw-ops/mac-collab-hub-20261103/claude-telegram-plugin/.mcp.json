@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "telegram": {
+      "command": "/Users/hungdinh/.nvm/versions/node/v22.16.0/bin/bun",
+      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/server.ts"]
+    }
+  }
+}
