@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { EventEmitter } from 'node:events'
 import type { ChildProcess } from 'node:child_process'
+import { EventEmitter } from 'node:events'
 import {
   buildAgyArgs,
   DEFAULT_IDLE_TIMEOUT_MS,
@@ -131,8 +131,7 @@ describe('runAgyProcess', () => {
     setTimeout(() => {
       child.stdout.emit(
         'data',
-        JSON.stringify({ event: 'init', conversation_id: 'c1', init: { model: 'g4', permission_mode: 'auto' } }) +
-          '\n',
+        JSON.stringify({ event: 'init', conversation_id: 'c1', init: { model: 'g4', permission_mode: 'auto' } }) + '\n',
       )
     }, 20)
 

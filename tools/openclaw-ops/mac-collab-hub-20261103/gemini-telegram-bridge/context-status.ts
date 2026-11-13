@@ -16,6 +16,11 @@ export type QuotaPolicy = {
 export type ThreadStats = {
   conversationId: string
   modelId: string
+  /** Latest single-step LLM context occupancy (`input_tokens + cache_read_tokens + output_tokens`). */
+  lastContextTokens?: number
+  /** Cumulative `(input_tokens + output_tokens)` reported by `agy` in `result.usage`. */
+  lastCumulativeTokens?: number
+  /** Legacy field from earlier builds that stored cumulative `total_tokens`; never used as context size. */
   lastTokens?: number
   turns: number
   lastDurationSeconds?: number
@@ -36,9 +41,13 @@ export type ContextWarningEvaluation = {
 
 function parsePositiveInt(raw: string | undefined, fallback: number): number {
   const trimmed = raw?.trim()
-  if (!trimmed) {return fallback}
+  if (!trimmed) {
+    return fallback
+  }
   const parsed = Number(trimmed)
-  if (!Number.isFinite(parsed) || parsed <= 0) {return fallback}
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback
+  }
   return Math.floor(parsed)
 }
 
@@ -102,11 +111,11 @@ function buildUsageBar(ratioPct: number): string {
 }
 
 /**
- * Checks whether token count crossed a new absolute token milestone (default 150k / 225k / 300k)
- * so Telegram warns once per tier and auto-hands over at 300k to preserve quota.
+ * Checks whether active per-step context occupancy crossed a new milestone (default 150k / 225k / 300k)
+ * so Telegram warns once per tier and auto-hands over at threshold to preserve quota.
  */
 export function evaluateContextWarning(params: {
-  totalTokens: number
+  contextTokens: number
   contextWindowTokens?: number
   lastWarnedTokens?: number
   thresholdsTokens?: readonly number[]
@@ -122,12 +131,12 @@ export function evaluateContextWarning(params: {
       ? params.autoHandoverTokens
       : DEFAULT_AUTO_HANDOVER_TOKENS
   const prevWarnedTokens = params.lastWarnedTokens ?? 0
-  const usagePct = Math.max(0, (params.totalTokens / windowTokens) * 100)
+  const usagePct = Math.max(0, (params.contextTokens / windowTokens) * 100)
   const prevWarnedPct = Math.round((prevWarnedTokens / windowTokens) * 100)
 
   let highestCrossed = 0
   for (const t of thresholds) {
-    if (params.totalTokens >= t && t > highestCrossed) {
+    if (params.contextTokens >= t && t > highestCrossed) {
       highestCrossed = t
     }
   }
@@ -146,8 +155,8 @@ export function evaluateContextWarning(params: {
   const pctRounded = Math.round(usagePct)
   const warningText =
     action === 'auto'
-      ? `${urgencyIcon} **Cảnh báo context:** phiên đã chạm **${formatCompactTokens(params.totalTokens)}** tokens (vượt ngưỡng auto ${formatCompactTokens(autoThreshold)} · ${pctRounded}% khung 1M) — đang tự động handover & mở phiên mới.`
-      : `${urgencyIcon} **Cảnh báo context:** phiên đã đạt **${formatCompactTokens(params.totalTokens)}** tokens (${pctRounded}% khung 1M · ngưỡng auto ${formatCompactTokens(autoThreshold)}).\n` +
+      ? `${urgencyIcon} **Cảnh báo context:** phiên đã chạm **${formatCompactTokens(params.contextTokens)}** tokens context thực tế (vượt ngưỡng auto ${formatCompactTokens(autoThreshold)} · ${pctRounded}% khung 1M) — đang tự động handover & mở phiên mới.`
+      : `${urgencyIcon} **Cảnh báo context:** phiên đã đạt **${formatCompactTokens(params.contextTokens)}** tokens context thực tế (${pctRounded}% khung 1M · ngưỡng auto ${formatCompactTokens(autoThreshold)}).\n` +
         `👉 Bấm nút bên dưới (hoặc gõ \`/handover\`) để dọn phiên tiết kiệm quota (hoặc \`/reset_thread\` nếu muốn xoá trắng).`
 
   return {
@@ -191,6 +200,8 @@ export class ThreadStatsStore {
     chatId: string
     conversationId: string
     modelId: string
+    contextTokens?: number
+    cumulativeTokens?: number
     totalTokens?: number
     durationSeconds?: number
     contextWindowTokens?: number
@@ -205,17 +216,24 @@ export class ThreadStatsStore {
     const prevTurns = sameConv ? prev.turns : 0
     const prevWarnedTokens = sameConv ? (prev.lastWarnedTokens ?? 0) : 0
     const prevWarnedPct = sameConv ? prev.lastWarnedPct : 0
-    const nextTokens =
-      typeof params.totalTokens === 'number' && Number.isFinite(params.totalTokens) && params.totalTokens >= 0
-        ? params.totalTokens
+    const nextContextTokens =
+      typeof params.contextTokens === 'number' && Number.isFinite(params.contextTokens) && params.contextTokens >= 0
+        ? params.contextTokens
         : sameConv
-          ? prev.lastTokens
+          ? prev.lastContextTokens
+          : undefined
+    const rawCum = params.cumulativeTokens ?? params.totalTokens
+    const nextCumulativeTokens =
+      typeof rawCum === 'number' && Number.isFinite(rawCum) && rawCum >= 0
+        ? rawCum
+        : sameConv
+          ? (prev.lastCumulativeTokens ?? prev.lastTokens)
           : undefined
 
     const warning =
-      typeof nextTokens === 'number'
+      typeof nextContextTokens === 'number'
         ? evaluateContextWarning({
-            totalTokens: nextTokens,
+            contextTokens: nextContextTokens,
             contextWindowTokens: params.contextWindowTokens,
             lastWarnedTokens: prevWarnedTokens,
             thresholdsTokens: params.thresholdsTokens,
@@ -231,11 +249,10 @@ export class ThreadStatsStore {
     const stats: ThreadStats = {
       conversationId: params.conversationId,
       modelId: params.modelId,
-      ...(typeof nextTokens === 'number' ? { lastTokens: nextTokens } : {}),
+      ...(typeof nextContextTokens === 'number' ? { lastContextTokens: nextContextTokens } : {}),
+      ...(typeof nextCumulativeTokens === 'number' ? { lastCumulativeTokens: nextCumulativeTokens } : {}),
       turns: prevTurns + 1,
-      ...(typeof params.durationSeconds === 'number'
-        ? { lastDurationSeconds: params.durationSeconds }
-        : {}),
+      ...(typeof params.durationSeconds === 'number' ? { lastDurationSeconds: params.durationSeconds } : {}),
       lastWarnedTokens: warning.nextWarnedTokens,
       lastWarnedPct: warning.nextWarnedPct,
       updatedAt: params.nowIso ?? new Date().toISOString(),
@@ -247,9 +264,13 @@ export class ThreadStatsStore {
   }
 
   clear(chatId: string): void {
-    if (!existsSync(this.filePath)) {return}
+    if (!existsSync(this.filePath)) {
+      return
+    }
     const all = this.loadAll()
-    if (!(chatId in all)) {return}
+    if (!(chatId in all)) {
+      return
+    }
     delete all[chatId]
     this.saveAll(all)
   }
@@ -277,9 +298,7 @@ export function formatContextStatusMessage(params: {
       ? params.autoHandoverTokens
       : DEFAULT_AUTO_HANDOVER_TOKENS
   const warnStart =
-    params.warnStartTokens && params.warnStartTokens > 0
-      ? params.warnStartTokens
-      : DEFAULT_WARN_TOKEN_THRESHOLDS[0]
+    params.warnStartTokens && params.warnStartTokens > 0 ? params.warnStartTokens : DEFAULT_WARN_TOKEN_THRESHOLDS[0]
   const botHandle = params.botUsername ? `@${params.botUsername}` : '@hungreo_gemini_bot'
   const activeStats =
     params.conversationId && params.stats && params.stats.conversationId === params.conversationId
@@ -299,26 +318,32 @@ export function formatContextStatusMessage(params: {
     const turnText = activeStats ? ` · ${activeStats.turns} lượt` : ''
     lines.push(`- **Phiên:** Đang mở (\`${shortConv}…\`${turnText})`)
 
-    if (activeStats && typeof activeStats.lastTokens === 'number') {
-      const windowPct = Math.max(0, (activeStats.lastTokens / windowTokens) * 100)
-      const budgetPct = Math.max(0, (activeStats.lastTokens / autoTokens) * 100)
+    if (activeStats && typeof activeStats.lastContextTokens === 'number') {
+      const windowPct = Math.max(0, (activeStats.lastContextTokens / windowTokens) * 100)
+      const budgetPct = Math.max(0, (activeStats.lastContextTokens / autoTokens) * 100)
       const nearAuto = Math.round(autoTokens * 0.75)
       const badge =
-        activeStats.lastTokens >= nearAuto
+        activeStats.lastContextTokens >= nearAuto
           ? '🔴 Sắp auto-handover'
-          : activeStats.lastTokens >= warnStart
+          : activeStats.lastContextTokens >= warnStart
             ? '🟡 Nên handover sớm'
             : '🟢 Dư dả'
       const bar = buildUsageBar(budgetPct)
       lines.push(
-        `- **Ngân sách phiên:** \`${formatNumber(activeStats.lastTokens)} / ${formatNumber(autoTokens)}\` tokens (**${budgetPct.toFixed(0)}%** mốc auto · ${windowPct.toFixed(1)}% khung 1M) · ${badge}`,
+        `- **Ngân sách context:** \`${formatNumber(activeStats.lastContextTokens)} / ${formatNumber(autoTokens)}\` tokens (**${budgetPct.toFixed(0)}%** mốc auto · ${windowPct.toFixed(1)}% khung 1M) · ${badge}`,
       )
       lines.push(`  ${bar}`)
-      if (typeof activeStats.lastDurationSeconds === 'number') {
-        lines.push(`- **Lượt gần nhất:** ${activeStats.lastDurationSeconds.toFixed(1)}s`)
-      }
     } else {
-      lines.push('- **Context:** Chưa có số liệu token (gửi thêm 1 tin sau khi restart bridge để đo)')
+      lines.push('- **Context thực tế:** Chưa có số liệu token (gửi thêm 1 tin sau khi restart bridge để đo)')
+    }
+    const cumTokens = activeStats?.lastCumulativeTokens ?? activeStats?.lastTokens
+    if (typeof cumTokens === 'number') {
+      lines.push(
+        `- **Tiêu thụ cộng dồn (agy):** \`${formatNumber(cumTokens)}\` tokens *(input mới + output, không phải kích thước context)*`,
+      )
+    }
+    if (activeStats && typeof activeStats.lastDurationSeconds === 'number') {
+      lines.push(`- **Lượt gần nhất:** ${activeStats.lastDurationSeconds.toFixed(1)}s`)
     }
   }
 

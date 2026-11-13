@@ -11,8 +11,7 @@
  * - Outbound redaction for keys, tokens, and secrets before `sendMessage`.
  */
 
-import { Bot, InlineKeyboard, type Context } from 'grammy'
-import type { ReactionTypeEmoji } from 'grammy/types'
+import { execFileSync } from 'node:child_process'
 import {
   chmodSync,
   existsSync,
@@ -26,9 +25,11 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { homedir } from 'node:os'
-import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { Bot, InlineKeyboard, type Context } from 'grammy'
+import type { ReactionTypeEmoji } from 'grammy/types'
+import { formatChunks, isEntityParseError, stripMdv2 } from '../claude-telegram-plugin/telegram-format.ts'
 import {
   BotLoopGuard,
   evaluateInboundGate,
@@ -36,18 +37,9 @@ import {
   type Access,
   type InboundContextLite,
 } from '../lib/collab-gate.ts'
-import { formatChunks, isEntityParseError, stripMdv2 } from '../claude-telegram-plugin/telegram-format.ts'
-import {
-  ALBUM_DEBOUNCE_MS,
-  MAX_ALBUM_PHOTOS,
-  MediaGroupBatcher,
-  extractImageSpec,
-  formatMediaPrompt,
-  mergeAlbumCaptions,
-  pickAlbumRepresentative,
-} from './media.ts'
+import { runXBriefPipeline } from '../x-brief-mac/runner.ts'
+import { startXBriefScheduler } from '../x-brief-mac/scheduler.ts'
 import { buildAgyArgs, resolveAgyTimeoutConfig, runAgyProcess, type AgyProcessResult } from './agy-runner.ts'
-import { formatClock, truncateSingleLine } from './stream-logger.ts'
 import { registerGeminiBotCommands } from './commands.ts'
 import {
   ThreadStatsStore,
@@ -62,21 +54,32 @@ import {
   formatHandoverResultMessage,
   type HandoverTrigger,
 } from './handover.ts'
-import { runXBriefPipeline } from '../x-brief-mac/runner.ts'
-import { startXBriefScheduler } from '../x-brief-mac/scheduler.ts'
+import {
+  ALBUM_DEBOUNCE_MS,
+  MAX_ALBUM_PHOTOS,
+  MediaGroupBatcher,
+  extractImageSpec,
+  formatMediaPrompt,
+  mergeAlbumCaptions,
+  pickAlbumRepresentative,
+} from './media.ts'
 import {
   MODEL_PRESETS,
   PendingPermissionStore,
+  canAlwaysAllowRule,
   createEphemeralSettingsWithRule,
   derivePermissionCandidate,
   findModelPresetById,
   formatHardDenyNotice,
+  formatPermissionDmMessage,
   grantPermissionRuleInFile,
   hasPermissionDenial,
   isRuleBlockedByDeny,
   resolveModelPreset,
+  resolveTurnExecutionPolicy,
   type ModelPresetKey,
 } from './permissions.ts'
+import { formatClock, truncateSingleLine } from './stream-logger.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const HUB_DIR = dirname(__dirname)
@@ -101,9 +104,17 @@ let currentModel = process.env.GEMINI_MODEL ?? 'gemini-4-hydrogen-high' // defau
 const GEMINI_MODE = process.env.GEMINI_MODE ?? 'accept-edits'
 const GEMINI_DANGEROUSLY_SKIP_PERMISSIONS = process.env.GEMINI_DANGEROUSLY_SKIP_PERMISSIONS === '1'
 const DEFAULT_SETTINGS_FILE = join(HUB_DIR, 'gemini-collab-settings.json')
+const GROUP_READONLY_SETTINGS_FILE = join(HUB_DIR, 'gemini-group-readonly-settings.json')
 const X_BRIEF_READONLY_SETTINGS_FILE = join(HUB_DIR, 'x-brief-mac', 'editor-readonly-settings.json')
 const GEMINI_SETTINGS_FILE =
   process.env.GEMINI_SETTINGS_FILE ?? (existsSync(DEFAULT_SETTINGS_FILE) ? DEFAULT_SETTINGS_FILE : '')
+const READONLY_SETTINGS_FILE =
+  process.env.GEMINI_READONLY_SETTINGS_FILE ??
+  (existsSync(GROUP_READONLY_SETTINGS_FILE)
+    ? GROUP_READONLY_SETTINGS_FILE
+    : existsSync(X_BRIEF_READONLY_SETTINGS_FILE)
+      ? X_BRIEF_READONLY_SETTINGS_FILE
+      : '')
 const INBOX_DIR = process.env.GEMINI_TELEGRAM_INBOX_DIR ?? '/tmp/gemini-telegram-inbox'
 
 function logTimeline(tag: string, message: string): void {
@@ -118,7 +129,9 @@ try {
   chmodSync(ENV_FILE, 0o600)
   for (const line of readFileSync(ENV_FILE, 'utf8').split('\n')) {
     const m = line.match(/^(\w+)=(.*)$/)
-    if (m && process.env[m[1]] === undefined) {process.env[m[1]] = m[2].trim()}
+    if (m && process.env[m[1]] === undefined) {
+      process.env[m[1]] = m[2].trim()
+    }
   }
 } catch {}
 
@@ -213,16 +226,22 @@ function saveThreads(map: Record<string, string>): void {
 }
 
 function chunkText(text: string, limit = 4000): string[] {
-  if (text.length <= limit) {return [text]}
+  if (text.length <= limit) {
+    return [text]
+  }
   const out: string[] = []
   let rest = text
   while (rest.length > limit) {
     let idx = rest.lastIndexOf('\n', limit)
-    if (idx < limit * 0.5) {idx = limit}
+    if (idx < limit * 0.5) {
+      idx = limit
+    }
     out.push(rest.slice(0, idx))
     rest = rest.slice(idx).replace(/^\n+/, '')
   }
-  if (rest) {out.push(rest)}
+  if (rest) {
+    out.push(rest)
+  }
   return out
 }
 
@@ -234,7 +253,9 @@ function pruneInbox(): void {
       const fullPath = join(INBOX_DIR, name)
       try {
         const st = statSync(fullPath)
-        if (st.isFile() && st.mtimeMs < cutoff) {unlinkSync(fullPath)}
+        if (st.isFile() && st.mtimeMs < cutoff) {
+          unlinkSync(fullPath)
+        }
       } catch {}
     }
   } catch {}
@@ -251,7 +272,9 @@ async function downloadTelegramFile(params: {
   maxBytes: number
 }): Promise<string> {
   const file = await params.ctx.api.getFile(params.fileId)
-  if (!file.file_path) {throw new Error('Telegram không trả về đường dẫn file')}
+  if (!file.file_path) {
+    throw new Error('Telegram không trả về đường dẫn file')
+  }
   if (file.file_size && file.file_size > params.maxBytes) {
     throw new Error(`File quá lớn (${(file.file_size / 1024 / 1024).toFixed(1)} MB)`)
   }
@@ -261,17 +284,25 @@ async function downloadTelegramFile(params: {
   try {
     res = await fetch(url, { signal: AbortSignal.timeout(30_000) })
   } catch (err) {
-    throw new Error(`Lỗi mạng khi tải file từ Telegram (${err instanceof Error ? err.name : 'fetch_error'})`, { cause: err })
+    throw new Error(`Lỗi mạng khi tải file từ Telegram (${err instanceof Error ? err.name : 'fetch_error'})`, {
+      cause: err,
+    })
   }
-  if (!res.ok) {throw new Error(`HTTP ${res.status} khi tải file từ Telegram`)}
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} khi tải file từ Telegram`)
+  }
   const buf = Buffer.from(await res.arrayBuffer())
   if (buf.byteLength > params.maxBytes) {
     throw new Error(`File vượt quá giới hạn ${(params.maxBytes / 1024 / 1024).toFixed(0)} MB`)
   }
 
   let ext = (file.file_path.split('.').pop() ?? params.fallbackExt).toLowerCase().replace(/[^a-z0-9]/g, '')
-  if (!ext) {ext = params.fallbackExt}
-  if (ext === 'oga') {ext = 'ogg'}
+  if (!ext) {
+    ext = params.fallbackExt
+  }
+  if (ext === 'oga') {
+    ext = 'ogg'
+  }
 
   const safeUid = params.fileUniqueId.replace(/[^a-zA-Z0-9_-]/g, '') || 'media'
   pruneInbox()
@@ -281,6 +312,8 @@ async function downloadTelegramFile(params: {
   return outPath
 }
 
+type TelegramChatType = 'private' | 'group' | 'supergroup' | 'channel'
+
 type GeminiTurnOutcome =
   | {
       kind: 'reply'
@@ -289,7 +322,7 @@ type GeminiTurnOutcome =
       warningAction?: ContextWarningAction
       usagePct?: number
     }
-  | { kind: 'denied'; result: AgyProcessResult }
+  | { kind: 'denied'; result: AgyProcessResult; isReadOnly: boolean; settingsPathUsed?: string }
 
 function invokeAgyPrompt(
   prompt: string,
@@ -319,6 +352,7 @@ function invokeAgyPrompt(
 
 async function runGeminiTurn(params: {
   chatId: string
+  chatType?: TelegramChatType
   senderLabel: string
   isBotSender: boolean
   userText: string
@@ -331,7 +365,26 @@ async function runGeminiTurn(params: {
     ? `[${params.senderLabel}]: ${params.userText}`
     : buildTelegramInitialPrompt(params.senderLabel, params.userText)
 
-  const res = await invokeAgyPrompt(prompt, existingConvId, params.settingsPathOverride)
+  const policy = resolveTurnExecutionPolicy({
+    chatType: params.chatType,
+    isBotSender: params.isBotSender,
+    defaultMode: GEMINI_MODE,
+    defaultSettingsPath: GEMINI_SETTINGS_FILE || undefined,
+    readonlySettingsPath: READONLY_SETTINGS_FILE || undefined,
+    dangerouslySkipPermissions: GEMINI_DANGEROUSLY_SKIP_PERMISSIONS,
+  })
+  const effectiveSettingsPath =
+    !policy.isReadOnly && params.settingsPathOverride ? params.settingsPathOverride : policy.settingsPath
+
+  logTimeline(
+    'Policy',
+    `chat=${params.chatId} type=${params.chatType ?? 'unknown'} bot=${params.isBotSender} mode=${policy.mode} readonly=${policy.isReadOnly}`,
+  )
+
+  const res = await invokeAgyPrompt(prompt, existingConvId, effectiveSettingsPath, {
+    mode: policy.mode,
+    dangerouslySkipPermissions: policy.dangerouslySkipPermissions,
+  })
 
   let reply = res.response
   const convId = res.conversationId
@@ -348,7 +401,8 @@ async function runGeminiTurn(params: {
       chatId: params.chatId,
       conversationId: convId,
       modelId: currentModel,
-      totalTokens: res.totalTokens,
+      contextTokens: res.contextTokens,
+      cumulativeTokens: res.totalTokens,
       durationSeconds: res.durationSeconds,
       contextWindowTokens: CONTEXT_WINDOW_TOKENS,
       thresholdsTokens: QUOTA_POLICY.warnTokenThresholds,
@@ -360,7 +414,7 @@ async function runGeminiTurn(params: {
       usagePct = warning.usagePct
       logTimeline(
         'Context',
-        `⚠️ chat=${params.chatId} action=${warning.action ?? 'button'} tokens=${stats.lastTokens ?? 0}/${QUOTA_POLICY.autoHandoverTokens} (${warning.usagePct.toFixed(1)}% of 1M)`,
+        `⚠️ chat=${params.chatId} action=${warning.action ?? 'button'} ctx=${stats.lastContextTokens ?? 0}/${QUOTA_POLICY.autoHandoverTokens} cum=${stats.lastCumulativeTokens ?? 0} (${warning.usagePct.toFixed(1)}% of 1M)`,
       )
     }
   } else if (!reply && existingConvId) {
@@ -372,7 +426,12 @@ async function runGeminiTurn(params: {
   }
 
   if (permissionDenied) {
-    return { kind: 'denied', result: res }
+    return {
+      kind: 'denied',
+      result: res,
+      isReadOnly: policy.isReadOnly,
+      settingsPathUsed: effectiveSettingsPath,
+    }
   }
 
   if (!reply) {
@@ -453,7 +512,9 @@ async function runAndDeliverXBrief(params: {
       return
     }
 
-    if (res.skipped) {return}
+    if (res.skipped) {
+      return
+    }
 
     for (const cid of params.targetChatIds) {
       await sendFormattedReply(cid, res.message, 4000, params.replyToMsgId)
@@ -498,7 +559,9 @@ async function sendFormattedReply(
         ...(useMdv2 ? { parse_mode: 'MarkdownV2' as const } : {}),
       })
       .catch(err => {
-        if (!useMdv2 || !isEntityParseError(err)) {throw err}
+        if (!useMdv2 || !isEntityParseError(err)) {
+          throw err
+        }
         return bot.api.sendMessage(chatId, stripMdv2(chunks[i]), { ...replyOpts, ...markupOpts })
       })
   }
@@ -525,27 +588,40 @@ async function performChatHandover(params: {
     handoversDir: HANDOVERS_DIR,
     recentTurns,
     summarizeTurn: async (convId, prompt) => {
-      const res = await invokeAgyPrompt(prompt, convId)
+      const res = await invokeAgyPrompt(prompt, convId, READONLY_SETTINGS_FILE || undefined, {
+        mode: 'plan',
+        dangerouslySkipPermissions: false,
+      })
       if (hasPermissionDenial(res) && !res.response) {
         return { ok: false, error: 'Bị chặn yêu cầu quyền công cụ khi tóm tắt' }
       }
       if (!res.response) {
-        return { ok: false, error: res.error ?? (res.exitCode !== 0 ? `agy exit ${res.exitCode}` : 'Empty response') }
+        return {
+          ok: false,
+          error: res.error ?? (res.exitCode !== 0 ? `agy exit ${res.exitCode}` : 'Empty response'),
+        }
       }
       return { ok: true, text: res.response }
     },
     seedNewTurn: async prompt => {
-      const res = await invokeAgyPrompt(prompt, undefined)
+      const res = await invokeAgyPrompt(prompt, undefined, READONLY_SETTINGS_FILE || undefined, {
+        mode: 'plan',
+        dangerouslySkipPermissions: false,
+      })
       if (hasPermissionDenial(res) && !res.conversationId) {
         return { ok: false, error: 'Bị chặn quyền công cụ khi mở phiên mới' }
       }
       if (!res.conversationId) {
-        return { ok: false, error: res.error ?? (res.exitCode !== 0 ? `agy exit ${res.exitCode}` : 'Thiếu conversationId') }
+        return {
+          ok: false,
+          error: res.error ?? (res.exitCode !== 0 ? `agy exit ${res.exitCode}` : 'Thiếu conversationId'),
+        }
       }
       return {
         ok: true,
         conversationId: res.conversationId,
         reply: res.response,
+        contextTokens: res.contextTokens,
         totalTokens: res.totalTokens,
         durationSeconds: res.durationSeconds,
       }
@@ -565,7 +641,8 @@ async function performChatHandover(params: {
         chatId: input.chatId,
         conversationId: input.conversationId,
         modelId: input.modelId,
-        totalTokens: input.totalTokens,
+        contextTokens: input.contextTokens,
+        cumulativeTokens: input.totalTokens,
         durationSeconds: input.durationSeconds,
         contextWindowTokens: CONTEXT_WINDOW_TOKENS,
         thresholdsTokens: QUOTA_POLICY.warnTokenThresholds,
@@ -577,25 +654,31 @@ async function performChatHandover(params: {
   if (result.ok) {
     logTimeline(
       'Handover',
-      `✅ done chat=${chatId} ${result.oldConversationId.slice(0, 8)}->${result.newConversationId.slice(0, 8)} tokens=${result.newTokens ?? 0}`,
+      `✅ done chat=${chatId} ${result.oldConversationId.slice(0, 8)}->${result.newConversationId.slice(0, 8)} ctx=${result.newContextTokens ?? 0} cum=${result.newTokens ?? 0}`,
     )
   } else {
     logTimeline('Handover', `⚠️ failed chat=${chatId} stage=${result.stage}: ${result.error}`)
   }
 
   const msgText = formatHandoverResultMessage(result, CONTEXT_WINDOW_TOKENS)
-  const retryMarkup = !result.ok && result.stage === 'summarize' ? buildAutoHandoverKeyboard('🔄 Thử lại Auto-Handover') : undefined
+  const retryMarkup =
+    !result.ok && result.stage === 'summarize' ? buildAutoHandoverKeyboard('🔄 Thử lại Auto-Handover') : undefined
   await sendFormattedReply(chatId, msgText, access.textChunkLimit ?? 4000, replyToMsgId, retryMarkup)
 }
 
-function buildPermissionKeyboard(requestId: string, includeMore: boolean): InlineKeyboard {
+function buildPermissionKeyboard(requestId: string, includeMore: boolean, includeAlways = true): InlineKeyboard {
   const kb = new InlineKeyboard()
   if (includeMore) {
     kb.text('🔍 See more', `gperm:more:${requestId}`)
   }
   kb.text('✅ Allow (1 lần)', `gperm:once:${requestId}`)
-  if (includeMore) {kb.row()}
-  return kb.text('🔓 Luôn cho phép', `gperm:always:${requestId}`).text('❌ Deny', `gperm:deny:${requestId}`)
+  if (includeMore) {
+    kb.row()
+  }
+  if (includeAlways) {
+    kb.text('🔓 Luôn cho phép', `gperm:always:${requestId}`)
+  }
+  return kb.text('❌ Deny', `gperm:deny:${requestId}`)
 }
 
 async function handleDeniedOutcome(params: {
@@ -606,8 +689,10 @@ async function handleDeniedOutcome(params: {
   isBotSender: boolean
   userText: string
   access: Access
+  isReadOnly: boolean
+  settingsPathUsed?: string
 }): Promise<string> {
-  const { res, chatId, msgId, senderLabel, isBotSender, userText, access } = params
+  const { res, chatId, msgId, senderLabel, isBotSender, userText, access, isReadOnly, settingsPathUsed } = params
   const derived = derivePermissionCandidate(res)
   if (!derived.ok) {
     logTimeline(
@@ -629,7 +714,8 @@ async function handleDeniedOutcome(params: {
   }
 
   const { candidate } = derived
-  const denyCheck = isRuleBlockedByDeny(GEMINI_SETTINGS_FILE, candidate.rule, candidate.rawInput)
+  const effectiveSettingsForDeny = settingsPathUsed || GEMINI_SETTINGS_FILE
+  const denyCheck = isRuleBlockedByDeny(effectiveSettingsForDeny, candidate.rule, candidate.rawInput)
   if (denyCheck.blocked) {
     logTimeline(
       'Permission',
@@ -642,10 +728,23 @@ async function handleDeniedOutcome(params: {
     })
   }
 
+  if (isReadOnly) {
+    logTimeline('Permission', `🔒 readonly-mode blocked (${candidate.rule}) chat=${chatId} bot=${isBotSender}`)
+    return formatHardDenyNotice({
+      reason:
+        'phòng chat nhóm / tin nhắn từ bot đang chạy ở chế độ chỉ đọc (`plan`), không cấp quyền ghi/chạy lệnh qua DM',
+      toolName: candidate.toolName,
+      rawInput: candidate.rawInput ? redactSensitiveOutput(candidate.rawInput) : undefined,
+    })
+  }
+
   if (access.allowFrom.length === 0) {
     const denied = res.deniedActions?.map(d => d.displayName ?? d.action ?? 'unknown').join(', ') ?? candidate.rule
     return `🛡️ Thao tác bị từ chối bởi chính sách an toàn headless (${denied}).`
   }
+
+  const alwaysCheck = canAlwaysAllowRule(candidate.rule, candidate.rawInput)
+  const canAlwaysAllow = alwaysCheck.allowed
 
   const entry = pendingPermissions.create({
     rule: candidate.rule,
@@ -653,6 +752,7 @@ async function handleDeniedOutcome(params: {
     description: candidate.description,
     inputPreview: candidate.inputPreview,
     rawInput: candidate.rawInput,
+    canAlwaysAllow,
     chatId,
     messageId: msgId,
     senderLabel,
@@ -660,11 +760,16 @@ async function handleDeniedOutcome(params: {
     userText,
   })
 
-  const keyboard = buildPermissionKeyboard(entry.requestId, true)
+  const keyboard = buildPermissionKeyboard(entry.requestId, true, canAlwaysAllow)
 
-  const dmText =
-    `🔐 Permission (Gemini): ${entry.rule}\n` +
-    `Từ: ${senderLabel} (chat ${chatId})`
+  const dmText = formatPermissionDmMessage({
+    rule: entry.rule,
+    senderLabel,
+    chatId,
+    rawInput: entry.rawInput,
+    inputPreview: entry.inputPreview,
+    canAlwaysAllow,
+  })
 
   for (const dmChatId of access.allowFrom) {
     void bot.api.sendMessage(dmChatId, dmText, { reply_markup: keyboard }).catch(err => {
@@ -672,6 +777,9 @@ async function handleDeniedOutcome(params: {
     })
   }
 
+  if (!canAlwaysAllow) {
+    return `⏳ Cần cấp quyền 1 lần cho \`${candidate.rule}\` — đã gửi nút [✅ Allow (1 lần) / ❌ Deny] (kèm lệnh đầy đủ) vào DM của anh Hưng.`
+  }
   return `⏳ Cần cấp quyền \`${candidate.rule}\` — đã gửi nút [✅ Allow (1 lần) / 🔓 Luôn cho phép / ❌ Deny] vào DM của anh Hưng.`
 }
 
@@ -693,7 +801,11 @@ async function runLockedHandover(params: {
     const msg = redactSensitiveOutput(err instanceof Error ? err.message : String(err))
     logTimeline('Handover', `⚠️ error chat=${chatId}: ${msg}`)
     await bot.api
-      .sendMessage(chatId, `⚠️ Lỗi khi chạy Auto-Handover: ${msg}`, (replyToMsgId ? { reply_parameters: { message_id: replyToMsgId } } : {}))
+      .sendMessage(
+        chatId,
+        `⚠️ Lỗi khi chạy Auto-Handover: ${msg}`,
+        replyToMsgId ? { reply_parameters: { message_id: replyToMsgId } } : {},
+      )
       .catch(() => {})
   } finally {
     clearInterval(typingTimer)
@@ -703,6 +815,7 @@ async function runLockedHandover(params: {
 
 async function runLockedTurnAndDeliver(params: {
   chatId: string
+  chatType?: TelegramChatType
   msgId: number
   senderLabel: string
   isBotSender: boolean
@@ -710,7 +823,7 @@ async function runLockedTurnAndDeliver(params: {
   userText: string
   settingsPathOverride?: string
 }): Promise<void> {
-  const { chatId, msgId, senderLabel, isBotSender, access, userText, settingsPathOverride } = params
+  const { chatId, chatType, msgId, senderLabel, isBotSender, access, userText, settingsPathOverride } = params
   const startedAt = Date.now()
   const typingTimer = setInterval(() => {
     void bot.api.sendChatAction(chatId, 'typing').catch(() => {})
@@ -720,6 +833,7 @@ async function runLockedTurnAndDeliver(params: {
   try {
     const outcome = await runGeminiTurn({
       chatId,
+      chatType,
       senderLabel,
       isBotSender,
       userText,
@@ -736,16 +850,12 @@ async function runLockedTurnAndDeliver(params: {
             isBotSender,
             userText,
             access,
+            isReadOnly: outcome.isReadOnly,
+            settingsPathUsed: outcome.settingsPathUsed,
           })
     const replyMarkup =
       outcome.kind === 'reply' && outcome.warningAction === 'button' ? buildAutoHandoverKeyboard() : undefined
-    const chunkCount = await sendFormattedReply(
-      chatId,
-      finalReply,
-      access.textChunkLimit ?? 4000,
-      msgId,
-      replyMarkup,
-    )
+    const chunkCount = await sendFormattedReply(chatId, finalReply, access.textChunkLimit ?? 4000, msgId, replyMarkup)
     const elapsedSec = ((Date.now() - startedAt) / 1000).toFixed(1)
     logTimeline('Telegram', `📤 sent ${chunkCount} chunk(s) to chat=${chatId} (Done in ${elapsedSec}s)`)
 
@@ -789,6 +899,7 @@ async function executeGeminiTurnAndReply(params: {
 }): Promise<void> {
   const { ctx, access, isBotSender, buildUserText } = params
   const chatId = String(ctx.chat!.id)
+  const chatType = ctx.chat?.type
   const msgId = ctx.message!.message_id
   const from = ctx.from!
   const senderLabel = from.username ? `@${from.username}` : String(from.id)
@@ -815,9 +926,7 @@ async function executeGeminiTurnAndReply(params: {
   )
   if (access.ackReaction) {
     void bot.api
-      .setMessageReaction(chatId, msgId, [
-        { type: 'emoji', emoji: access.ackReaction as ReactionTypeEmoji['emoji'] },
-      ])
+      .setMessageReaction(chatId, msgId, [{ type: 'emoji', emoji: access.ackReaction as ReactionTypeEmoji['emoji'] }])
       .catch(() => {})
   }
 
@@ -837,6 +946,7 @@ async function executeGeminiTurnAndReply(params: {
 
   await runLockedTurnAndDeliver({
     chatId,
+    chatType,
     msgId,
     senderLabel,
     isBotSender,
@@ -846,7 +956,9 @@ async function executeGeminiTurnAndReply(params: {
 }
 
 async function handleAlbumBatch(items: Context[]): Promise<void> {
-  if (items.length === 0) {return}
+  if (items.length === 0) {
+    return
+  }
   const access = loadAccess()
   const repCtx = pickAlbumRepresentative(items)
   const verdict = evaluateInboundGate({
@@ -855,7 +967,9 @@ async function handleAlbumBatch(items: Context[]): Promise<void> {
     botUsername,
     loopGuard,
   })
-  if (verdict.action !== 'deliver') {return}
+  if (verdict.action !== 'deliver') {
+    return
+  }
 
   const rawText = mergeAlbumCaptions(items)
   await executeGeminiTurnAndReply({
@@ -866,7 +980,9 @@ async function handleAlbumBatch(items: Context[]): Promise<void> {
       const photoPaths: string[] = []
       for (const item of items.slice(0, MAX_ALBUM_PHOTOS)) {
         const spec = extractImageSpec(item.message)
-        if (!spec) {continue}
+        if (!spec) {
+          continue
+        }
         const path = await downloadTelegramFile({
           ctx: item,
           fileId: spec.fileId,
@@ -902,15 +1018,15 @@ function buildModelKeyboard(activeModelId: string): InlineKeyboard {
 bot.command('model', async ctx => {
   const access = loadAccess()
   const senderId = String(ctx.from?.id ?? '')
-  if (!ctx.from || ctx.from.is_bot || !access.allowFrom.includes(senderId)) {return}
+  if (!ctx.from || ctx.from.is_bot || !access.allowFrom.includes(senderId)) {
+    return
+  }
 
   const arg = (ctx.match ?? '').trim()
   if (arg) {
     const preset = resolveModelPreset(arg)
     if (!preset) {
-      await ctx.reply(
-        `Model không hợp lệ: "${arg}". Các preset hỗ trợ: hydrogen, orchestrator, argon, flash.`,
-      )
+      await ctx.reply(`Model không hợp lệ: "${arg}". Các preset hỗ trợ: hydrogen, orchestrator, argon, flash.`)
       return
     }
     currentModel = preset.id
@@ -929,7 +1045,9 @@ bot.command('model', async ctx => {
 bot.command('status', async ctx => {
   const access = loadAccess()
   const senderId = String(ctx.from?.id ?? '')
-  if (!ctx.from || ctx.from.is_bot || !access.allowFrom.includes(senderId)) {return}
+  if (!ctx.from || ctx.from.is_bot || !access.allowFrom.includes(senderId)) {
+    return
+  }
 
   const chatId = String(ctx.chat.id)
   const threads = loadThreads()
@@ -954,7 +1072,9 @@ bot.command('status', async ctx => {
 bot.command('handover', async ctx => {
   const access = loadAccess()
   const senderId = String(ctx.from?.id ?? '')
-  if (!ctx.from || ctx.from.is_bot || !access.allowFrom.includes(senderId)) {return}
+  if (!ctx.from || ctx.from.is_bot || !access.allowFrom.includes(senderId)) {
+    return
+  }
 
   const chatId = String(ctx.chat.id)
   if (activeLocks.has(chatId)) {
@@ -974,7 +1094,9 @@ bot.command('handover', async ctx => {
 bot.command('reset_thread', async ctx => {
   const access = loadAccess()
   const senderId = String(ctx.from?.id ?? '')
-  if (!ctx.from || ctx.from.is_bot || !access.allowFrom.includes(senderId)) {return}
+  if (!ctx.from || ctx.from.is_bot || !access.allowFrom.includes(senderId)) {
+    return
+  }
   const chatId = String(ctx.chat.id)
   const threads = loadThreads()
   delete threads[chatId]
@@ -991,15 +1113,23 @@ bot.command('start', async ctx => {
 bot.command('x_brief', async ctx => {
   const access = loadAccess()
   const senderId = String(ctx.from?.id ?? '')
-  if (!ctx.from || ctx.from.is_bot || !access.allowFrom.includes(senderId)) {return}
-
-  const chatId = String(ctx.chat.id)
-  if (xBriefRunning) {
-    await ctx.reply('⏳ Bản tin X Đối Chứng đang chạy, anh đợi chút nhé.', (ctx.message?.message_id ? { reply_parameters: { message_id: ctx.message.message_id } } : {}))
+  if (!ctx.from || ctx.from.is_bot || !access.allowFrom.includes(senderId)) {
     return
   }
 
-  await ctx.reply('🔎 Đang thu thập & biên tập Bản tin X Đối Chứng (Apify + Gemini Mac)...', (ctx.message?.message_id ? { reply_parameters: { message_id: ctx.message.message_id } } : {}))
+  const chatId = String(ctx.chat.id)
+  if (xBriefRunning) {
+    await ctx.reply(
+      '⏳ Bản tin X Đối Chứng đang chạy, anh đợi chút nhé.',
+      ctx.message?.message_id ? { reply_parameters: { message_id: ctx.message.message_id } } : {},
+    )
+    return
+  }
+
+  await ctx.reply(
+    '🔎 Đang thu thập & biên tập Bản tin X Đối Chứng (Apify + Gemini Mac)...',
+    ctx.message?.message_id ? { reply_parameters: { message_id: ctx.message.message_id } } : {},
+  )
   void runAndDeliverXBrief({
     mode: 'test',
     targetChatIds: [chatId],
@@ -1090,7 +1220,8 @@ bot.on('callback_query:data', async ctx => {
       `description: ${safeDesc}\n` +
       `input_preview:\n${safeInput}\n` +
       `prompt: ${safeUserText}`
-    const keyboard = buildPermissionKeyboard(requestId, false)
+    const allowAlways = entry.canAlwaysAllow ?? canAlwaysAllowRule(entry.rule, entry.rawInput).allowed
+    const keyboard = buildPermissionKeyboard(requestId, false, allowAlways)
     await ctx.editMessageText(expanded.slice(0, 3900), { reply_markup: keyboard }).catch(() => {})
     await ctx.answerCallbackQuery().catch(() => {})
     return
@@ -1118,6 +1249,8 @@ bot.on('callback_query:data', async ctx => {
     return
   }
 
+  const replayChatType: TelegramChatType = entry.chatId.startsWith('-') ? 'group' : 'private'
+
   if (behavior === 'once') {
     const ephem = createEphemeralSettingsWithRule({
       settingsPath: GEMINI_SETTINGS_FILE,
@@ -1136,12 +1269,15 @@ bot.on('callback_query:data', async ctx => {
     logTimeline('Permission', `⏱️ granted ONCE ${entry.rule} for chat=${entry.chatId}`)
     await ctx.answerCallbackQuery({ text: '✅ Allow 1 lần — đang chạy lại' }).catch(() => {})
     await ctx
-      .editMessageText(`${baseText}\n\n✅ Allow (1 lần): ${entry.rule}\n⏳ Đang chạy lại yêu cầu (không lưu vào settings)...`)
+      .editMessageText(
+        `${baseText}\n\n✅ Allow (1 lần): ${entry.rule}\n⏳ Đang chạy lại yêu cầu (không lưu vào settings)...`,
+      )
       .catch(() => {})
 
     activeLocks.add(entry.chatId)
     void runLockedTurnAndDeliver({
       chatId: entry.chatId,
+      chatType: replayChatType,
       msgId: entry.messageId,
       senderLabel: entry.senderLabel,
       isBotSender: entry.isBotSender,
@@ -1153,6 +1289,19 @@ bot.on('callback_query:data', async ctx => {
   }
 
   // behavior === 'always'
+  const alwaysCheck =
+    entry.canAlwaysAllow === false
+      ? { allowed: false, reason: 'interpreter_or_shell_once_only' }
+      : canAlwaysAllowRule(entry.rule, entry.rawInput)
+  if (!alwaysCheck.allowed) {
+    pendingPermissions.delete(requestId)
+    await ctx.answerCallbackQuery({ text: '🔒 Shell/interpreter chỉ hỗ trợ Allow (1 lần)' }).catch(() => {})
+    await ctx
+      .editMessageText(`${baseText}\n\n🔒 Blocked (${alwaysCheck.reason ?? 'always_allow_forbidden'})`)
+      .catch(() => {})
+    return
+  }
+
   const grantRes = grantPermissionRuleInFile(GEMINI_SETTINGS_FILE, entry.rule, entry.rawInput)
   pendingPermissions.delete(requestId)
   if (!grantRes.ok) {
@@ -1164,12 +1313,15 @@ bot.on('callback_query:data', async ctx => {
   logTimeline('Permission', `🔓 granted ALWAYS ${entry.rule} for chat=${entry.chatId}`)
   await ctx.answerCallbackQuery({ text: '🔓 Luôn cho phép — đang chạy lại' }).catch(() => {})
   await ctx
-    .editMessageText(`${baseText}\n\n🔓 Luôn cho phép (đã lưu vào settings): ${entry.rule}\n⏳ Đang chạy lại yêu cầu...`)
+    .editMessageText(
+      `${baseText}\n\n🔓 Luôn cho phép (đã lưu vào settings): ${entry.rule}\n⏳ Đang chạy lại yêu cầu...`,
+    )
     .catch(() => {})
 
   activeLocks.add(entry.chatId)
   void runLockedTurnAndDeliver({
     chatId: entry.chatId,
+    chatType: replayChatType,
     msgId: entry.messageId,
     senderLabel: entry.senderLabel,
     isBotSender: entry.isBotSender,
@@ -1180,10 +1332,14 @@ bot.on('callback_query:data', async ctx => {
 
 bot.on(['message:text', 'message:photo', 'message:voice', 'message:document'], async ctx => {
   const imageSpec = extractImageSpec(ctx.message)
-  if (ctx.message.document && !imageSpec) {return}
+  if (ctx.message.document && !imageSpec) {
+    return
+  }
 
   if (ctx.message.media_group_id && imageSpec) {
-    if (!ctx.from || !ctx.chat) {return}
+    if (!ctx.from || !ctx.chat) {
+      return
+    }
     const key = `${ctx.chat.id}:${ctx.from.id}:${ctx.message.media_group_id}`
     albumBatcher.enqueue(key, ctx, items => {
       void handleAlbumBatch(items)
@@ -1198,7 +1354,9 @@ bot.on(['message:text', 'message:photo', 'message:voice', 'message:document'], a
     botUsername,
     loopGuard,
   })
-  if (verdict.action !== 'deliver') {return}
+  if (verdict.action !== 'deliver') {
+    return
+  }
 
   const msgId = ctx.message.message_id
   const rawText = (ctx.message.text ?? ctx.message.caption ?? '').trim()
@@ -1263,12 +1421,16 @@ bot.on(['message:text', 'message:photo', 'message:voice', 'message:document'], a
 
 let shuttingDown = false
 function shutdown(): void {
-  if (shuttingDown) {return}
+  if (shuttingDown) {
+    return
+  }
   shuttingDown = true
   xBriefScheduler?.stop()
   albumBatcher.clearAll()
   try {
-    if (parseInt(readFileSync(PID_FILE, 'utf8'), 10) === process.pid) {rmSync(PID_FILE)}
+    if (parseInt(readFileSync(PID_FILE, 'utf8'), 10) === process.pid) {
+      rmSync(PID_FILE)
+    }
   } catch {}
   setTimeout(() => process.exit(0), 2000)
   void Promise.resolve(bot.stop()).finally(() => process.exit(0))
@@ -1278,7 +1440,7 @@ process.on('SIGINT', shutdown)
 process.on('SIGHUP', shutdown)
 
 bot.catch(err => {
-  process.stderr.write(`gemini-telegram-bridge: handler error: ${err.error}\n`)
+  process.stderr.write(`gemini-telegram-bridge: handler error: ${String(err.error)}\n`)
 })
 
 void (async () => {
@@ -1301,7 +1463,9 @@ void (async () => {
         log: msg => logTimeline('XBrief', msg),
         onTrigger: async () => {
           const access = loadAccess()
-          if (access.allowFrom.length === 0) {return}
+          if (access.allowFrom.length === 0) {
+            return
+          }
           await runAndDeliverXBrief({
             mode: 'scheduled',
             targetChatIds: access.allowFrom,

@@ -19,16 +19,20 @@ export type AgyProcessResult = AgyStreamResult & {
 
 export type SpawnFn = typeof spawn
 
-function parseTimeoutMs(
-  raw: string | undefined,
-  fallbackMs: number,
-  options: { allowZero?: boolean } = {},
-): number {
-  if (raw === undefined || raw.trim() === '') {return fallbackMs}
+function parseTimeoutMs(raw: string | undefined, fallbackMs: number, options: { allowZero?: boolean } = {}): number {
+  if (raw === undefined || raw.trim() === '') {
+    return fallbackMs
+  }
   const parsed = Number(raw.trim())
-  if (!Number.isFinite(parsed)) {return fallbackMs}
-  if (parsed === 0 && options.allowZero) {return 0}
-  if (parsed <= 0) {return fallbackMs}
+  if (!Number.isFinite(parsed)) {
+    return fallbackMs
+  }
+  if (parsed === 0 && options.allowZero) {
+    return 0
+  }
+  if (parsed <= 0) {
+    return fallbackMs
+  }
   return Math.floor(parsed)
 }
 
@@ -39,7 +43,9 @@ function parseTimeoutMs(
  */
 export function resolveAgyTimeoutConfig(env: Record<string, string | undefined> = process.env): AgyTimeoutConfig {
   const maxTimeoutMs = parseTimeoutMs(env.GEMINI_MAX_TIMEOUT_MS ?? env.GEMINI_TIMEOUT_MS, DEFAULT_MAX_TIMEOUT_MS)
-  const rawIdle = parseTimeoutMs(env.GEMINI_IDLE_TIMEOUT_MS, DEFAULT_IDLE_TIMEOUT_MS, { allowZero: true })
+  const rawIdle = parseTimeoutMs(env.GEMINI_IDLE_TIMEOUT_MS, DEFAULT_IDLE_TIMEOUT_MS, {
+    allowZero: true,
+  })
   const idleTimeoutMs = rawIdle > 0 ? Math.min(rawIdle, maxTimeoutMs) : 0
   const killGraceMs = parseTimeoutMs(env.GEMINI_KILL_GRACE_MS, DEFAULT_KILL_GRACE_MS)
   return { maxTimeoutMs, idleTimeoutMs, killGraceMs }
@@ -56,19 +62,21 @@ export function buildAgyArgs(params: {
   dangerouslySkipPermissions?: boolean
   prompt: string
 }): string[] {
-  const args: string[] = [
-    '--output-format',
-    'stream-json',
-    '--sandbox',
-  ]
+  const args: string[] = ['--output-format', 'stream-json', '--sandbox']
   if (params.dangerouslySkipPermissions) {
     args.push('--dangerously-skip-permissions')
   } else {
     args.push('--mode', params.mode || 'accept-edits')
   }
-  if (params.settingsPath) {args.push('--settings', params.settingsPath)}
-  if (params.model) {args.push('--model', params.model)}
-  if (params.conversationId) {args.push('--conversation', params.conversationId)}
+  if (params.settingsPath) {
+    args.push('--settings', params.settingsPath)
+  }
+  if (params.model) {
+    args.push('--model', params.model)
+  }
+  if (params.conversationId) {
+    args.push('--conversation', params.conversationId)
+  }
   args.push('-p', params.prompt)
   return args
 }
@@ -114,20 +122,30 @@ export function runAgyProcess(params: {
     let idleTimer: ReturnType<typeof setTimeout> | undefined
 
     const clearTimers = (): void => {
-      if (maxTimer) {clearTimeout(maxTimer)}
-      if (idleTimer) {clearTimeout(idleTimer)}
+      if (maxTimer) {
+        clearTimeout(maxTimer)
+      }
+      if (idleTimer) {
+        clearTimeout(idleTimer)
+      }
     }
 
     const fail = (err: Error): void => {
-      if (settled) {return}
+      if (settled) {
+        return
+      }
       settled = true
       clearTimers()
       reject(err)
     }
 
     const resetIdleTimer = (): void => {
-      if (settled || timeouts.idleTimeoutMs <= 0) {return}
-      if (idleTimer) {clearTimeout(idleTimer)}
+      if (settled || timeouts.idleTimeoutMs <= 0) {
+        return
+      }
+      if (idleTimer) {
+        clearTimeout(idleTimer)
+      }
       idleTimer = setTimeout(() => {
         terminateChild(child, timeouts.killGraceMs)
         const sec = Math.round(timeouts.idleTimeoutMs / 1000)
@@ -166,9 +184,18 @@ export function runAgyProcess(params: {
       },
       onResult: res => {
         const parts = [`status=${res.status || 'DONE'}`]
-        if (typeof res.durationSeconds === 'number') {parts.push(`dur=${res.durationSeconds.toFixed(1)}s`)}
-        if (typeof res.numTurns === 'number') {parts.push(`turns=${res.numTurns}`)}
-        if (typeof res.totalTokens === 'number') {parts.push(`tokens=${res.totalTokens}`)}
+        if (typeof res.durationSeconds === 'number') {
+          parts.push(`dur=${res.durationSeconds.toFixed(1)}s`)
+        }
+        if (typeof res.numTurns === 'number') {
+          parts.push(`turns=${res.numTurns}`)
+        }
+        if (typeof res.contextTokens === 'number') {
+          parts.push(`ctx=${res.contextTokens}`)
+        }
+        if (typeof res.totalTokens === 'number') {
+          parts.push(`cum_tokens=${res.totalTokens}`)
+        }
         if (res.deniedActions?.length) {
           parts.push(`denied=${res.deniedActions.map(d => d.action ?? d.displayName ?? 'unknown').join(',')}`)
         }
@@ -194,7 +221,9 @@ export function runAgyProcess(params: {
     })
 
     child.on('close', exitCode => {
-      if (settled) {return}
+      if (settled) {
+        return
+      }
       settled = true
       clearTimers()
       const parsed = parser.finish()

@@ -8,10 +8,7 @@ export type TelegramCommandScope = {
 }
 
 export type SetMyCommandsApi = {
-  setMyCommands: (
-    commands: TelegramBotCommand[],
-    other?: { scope?: TelegramCommandScope },
-  ) => Promise<unknown>
+  setMyCommands: (commands: TelegramBotCommand[], other?: { scope?: TelegramCommandScope }) => Promise<unknown>
 }
 
 export const GEMINI_BOT_COMMANDS: readonly TelegramBotCommand[] = [

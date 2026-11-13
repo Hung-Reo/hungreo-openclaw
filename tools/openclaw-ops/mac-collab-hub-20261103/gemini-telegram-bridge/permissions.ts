@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join, posix } from 'node:path'
+import { redactSensitiveOutput } from '../lib/collab-gate.ts'
 import type { AgyStreamResult, ToolStepRecord } from './stream-logger.ts'
 
 export type ModelPresetKey = 'hydrogen' | 'orchestrator' | 'argon' | 'flash'
@@ -41,7 +42,9 @@ export const MODEL_PRESETS: Record<ModelPresetKey, ModelPreset> = {
 
 export function resolveModelPreset(raw: string): ModelPreset | undefined {
   const key = raw.trim().toLowerCase() as ModelPresetKey
-  if (key in MODEL_PRESETS) {return MODEL_PRESETS[key]}
+  if (key in MODEL_PRESETS) {
+    return MODEL_PRESETS[key]
+  }
   return Object.values(MODEL_PRESETS).find(p => p.id.toLowerCase() === key)
 }
 
@@ -50,15 +53,27 @@ export function findModelPresetById(modelId: string): ModelPreset | undefined {
   return Object.values(MODEL_PRESETS).find(p => p.id.toLowerCase() === normalized)
 }
 
-const SUBCOMMAND_CLIS = new Set([
-  'git',
-  'gh',
-  'npm',
-  'pnpm',
+const SUBCOMMAND_CLIS = new Set(['git', 'gh', 'npm', 'pnpm', 'bun', 'docker', 'kubectl', 'cargo'])
+
+const ONCE_ONLY_COMMANDS = new Set([
+  'sh',
+  'bash',
+  'zsh',
+  'dash',
+  'ksh',
+  'csh',
+  'tcsh',
+  'fish',
+  'osascript',
+  'python',
+  'python3',
+  'node',
   'bun',
-  'docker',
-  'kubectl',
-  'cargo',
+  'deno',
+  'perl',
+  'ruby',
+  'php',
+  'lua',
 ])
 
 const DANGEROUS_SHELL_RE = /&&|\|\||[;|`<>]|[\r\n]|\$\(/
@@ -66,11 +81,7 @@ const EXPLICIT_RULE_RE = /(command|read_file|write_file)\(([^()]+)\)/
 const PERMISSION_ERROR_RE =
   /permission\s+denied|action\s+blocked|blocked\s+by.*policy|requires?\s+(?:user\s+)?approval|headless\s+policy|ask\s+rule/i
 
-export function formatHardDenyNotice(params: {
-  reason: string
-  toolName?: string
-  rawInput?: string
-}): string {
+export function formatHardDenyNotice(params: { reason: string; toolName?: string; rawInput?: string }): string {
   const lines = [`🔒 Thao tác bị từ chối cứng: ${params.reason}.`]
   if (params.toolName && params.toolName !== 'unknown') {
     lines.push(`• Công cụ: \`${params.toolName.replace(/`/g, "'")}\``)
@@ -84,10 +95,13 @@ export function formatHardDenyNotice(params: {
 }
 
 export function hasPermissionDenial(res: AgyStreamResult): boolean {
-  if (res.deniedActions && res.deniedActions.length > 0) {return true}
+  if (res.deniedActions && res.deniedActions.length > 0) {
+    return true
+  }
   return Boolean(
     res.toolSteps?.some(
-      step => step.state === 'ERROR' && typeof step.errorMessage === 'string' && PERMISSION_ERROR_RE.test(step.errorMessage),
+      step =>
+        step.state === 'ERROR' && typeof step.errorMessage === 'string' && PERMISSION_ERROR_RE.test(step.errorMessage),
     ),
   )
 }
@@ -119,13 +133,17 @@ function tokenizeCommandLine(commandLine: string): string[] {
     }
     current += ch
   }
-  if (current) {tokens.push(current)}
+  if (current) {
+    tokens.push(current)
+  }
   return tokens
 }
 
 function parseRule(rule: string): { kind: 'command' | 'read_file' | 'write_file'; target: string } | undefined {
   const m = /^(command|read_file|write_file)\((.+)\)$/.exec(rule.trim())
-  if (!m) {return undefined}
+  if (!m) {
+    return undefined
+  }
   return {
     kind: m[1] as 'command' | 'read_file' | 'write_file',
     target: m[2].trim(),
@@ -161,34 +179,45 @@ export type PermissionCandidate = {
 
 export type DerivePermissionResult =
   | { ok: true; candidate: PermissionCandidate }
-  | { ok: false; blockedReason: string; toolName: string; description: string; inputPreview: string; rawInput?: string }
+  | {
+      ok: false
+      blockedReason: string
+      toolName: string
+      description: string
+      inputPreview: string
+      rawInput?: string
+    }
 
 function pickBlockedStep(toolSteps: ToolStepRecord[] | undefined): ToolStepRecord | undefined {
-  if (!toolSteps || toolSteps.length === 0) {return undefined}
+  if (!toolSteps || toolSteps.length === 0) {
+    return undefined
+  }
   for (let i = toolSteps.length - 1; i >= 0; i--) {
-    if (toolSteps[i].state === 'ERROR') {return toolSteps[i]}
+    if (toolSteps[i].state === 'ERROR') {
+      return toolSteps[i]
+    }
   }
   return toolSteps[toolSteps.length - 1]
 }
 
 function extractPathParam(params: Record<string, unknown> | undefined): string {
-  if (!params) {return ''}
+  if (!params) {
+    return ''
+  }
   const raw = params.Path ?? params.TargetFile ?? params.AbsolutePath ?? params.path
   return typeof raw === 'string' ? raw.trim() : ''
 }
 
 export function derivePermissionCandidate(res: AgyStreamResult): DerivePermissionResult {
   const step = pickBlockedStep(res.toolSteps)
-  const toolName =
-    step?.toolName ??
-    res.deniedActions?.[0]?.displayName ??
-    res.deniedActions?.[0]?.action ??
-    'unknown'
+  const toolName = step?.toolName ?? res.deniedActions?.[0]?.displayName ?? res.deniedActions?.[0]?.action ?? 'unknown'
   const params = step?.parameters
   const cmdLine = typeof params?.CommandLine === 'string' ? params.CommandLine.trim() : ''
   const filePath = extractPathParam(params)
   const rawInput = cmdLine || filePath || undefined
-  const inputPreview = params ? JSON.stringify(params) : (res.deniedActions?.map(d => d.displayName ?? d.action).join(', ') ?? '')
+  const inputPreview = params
+    ? JSON.stringify(params)
+    : (res.deniedActions?.map(d => d.displayName ?? d.action).join(', ') ?? '')
   const description =
     step?.errorMessage?.trim() ||
     res.deniedActions?.map(d => d.displayName ?? d.action ?? 'unknown').join(', ') ||
@@ -206,10 +235,7 @@ export function derivePermissionCandidate(res: AgyStreamResult): DerivePermissio
   }
 
   // Prefer explicit rule if present in errorMessage or deniedActions[].action
-  const explicitSources = [
-    step?.errorMessage ?? '',
-    ...(res.deniedActions ?? []).map(d => d.action ?? ''),
-  ]
+  const explicitSources = [step?.errorMessage ?? '', ...(res.deniedActions ?? []).map(d => d.action ?? '')]
   for (const src of explicitSources) {
     const match = EXPLICIT_RULE_RE.exec(src)
     if (match) {
@@ -252,10 +278,7 @@ export function derivePermissionCandidate(res: AgyStreamResult): DerivePermissio
     const bin = tokens[0]
     const binBase = basename(bin)
     const second = tokens[1]
-    const ruleTarget =
-      SUBCOMMAND_CLIS.has(binBase) && second && !second.startsWith('-')
-        ? `${bin} ${second}`
-        : bin
+    const ruleTarget = SUBCOMMAND_CLIS.has(binBase) && second && !second.startsWith('-') ? `${bin} ${second}` : bin
     return {
       ok: true,
       candidate: {
@@ -309,7 +332,9 @@ export function isRuleBlockedByDeny(
   home = homedir(),
 ): { blocked: boolean; matchedDeny?: string } {
   const parsedRule = parseRule(rule)
-  if (!parsedRule) {return { blocked: true, matchedDeny: 'invalid_rule_syntax' }}
+  if (!parsedRule) {
+    return { blocked: true, matchedDeny: 'invalid_rule_syntax' }
+  }
 
   if (parsedRule.kind === 'command') {
     if (DANGEROUS_SHELL_RE.test(parsedRule.target) || (rawInput && DANGEROUS_SHELL_RE.test(rawInput))) {
@@ -317,7 +342,9 @@ export function isRuleBlockedByDeny(
     }
   }
 
-  if (!settingsPath) {return { blocked: true, matchedDeny: 'settings_unreadable' }}
+  if (!settingsPath) {
+    return { blocked: true, matchedDeny: 'settings_unreadable' }
+  }
 
   let settings: SettingsPermissionsFile
   try {
@@ -332,16 +359,23 @@ export function isRuleBlockedByDeny(
   }
 
   for (const denyEntry of denyList) {
-    if (typeof denyEntry !== 'string') {continue}
+    if (typeof denyEntry !== 'string') {
+      continue
+    }
     const parsedDeny = parseRule(denyEntry)
-    if (!parsedDeny) {continue}
+    if (!parsedDeny) {
+      continue
+    }
 
     if (parsedRule.kind === 'command' && parsedDeny.kind === 'command') {
       const cmd = parsedRule.target
-      const cmdBase = basename(cmd.split(/\s+/)[0] ?? '') + (cmd.includes(' ') ? ` ${cmd.split(/\s+/).slice(1).join(' ')}` : '')
+      const cmdBase =
+        basename(cmd.split(/\s+/)[0] ?? '') + (cmd.includes(' ') ? ` ${cmd.split(/\s+/).slice(1).join(' ')}` : '')
       const d = parsedDeny.target
       const candidates = [cmd, cmdBase]
-      if (rawInput) {candidates.push(rawInput.trim())}
+      if (rawInput) {
+        candidates.push(rawInput.trim())
+      }
       for (const c of candidates) {
         if (c === d || c.startsWith(`${d} `) || d.startsWith(`${c} `)) {
           return { blocked: true, matchedDeny: denyEntry }
@@ -350,10 +384,7 @@ export function isRuleBlockedByDeny(
       continue
     }
 
-    if (
-      (parsedRule.kind === 'read_file' || parsedRule.kind === 'write_file') &&
-      parsedDeny.kind === parsedRule.kind
-    ) {
+    if ((parsedRule.kind === 'read_file' || parsedRule.kind === 'write_file') && parsedDeny.kind === parsedRule.kind) {
       const p = normalizeRulePath(parsedRule.target, home)
       const d = normalizeRulePath(parsedDeny.target, home)
       if (p === d || p.startsWith(`${d}/`) || d.startsWith(`${p}/`)) {
@@ -404,6 +435,98 @@ function prepareSettingsWithRule(params: {
   }
 }
 
+function extractCommandExecutableBase(cmdText: string): string {
+  const tokens = tokenizeCommandLine(cmdText).filter(t => !/^[A-Za-z_][A-Za-z0-9_]*=/.test(t))
+  if (tokens.length === 0) {
+    return ''
+  }
+  return basename(tokens[0]).toLowerCase()
+}
+
+/**
+ * Checks whether a derived rule is eligible for permanent "Always allow" persistence.
+ * Shells and script interpreters are restricted to one-time approval only so approving
+ * e.g. `python3 script.py` never unlocks arbitrary interpreter execution permanently.
+ */
+export function canAlwaysAllowRule(rule: string, rawInput?: string): { allowed: boolean; reason?: string } {
+  const parsed = parseRule(rule)
+  if (!parsed) {
+    return { allowed: false, reason: 'invalid_rule_syntax' }
+  }
+  if (parsed.kind !== 'command') {
+    return { allowed: true }
+  }
+  if (DANGEROUS_SHELL_RE.test(parsed.target) || (rawInput && DANGEROUS_SHELL_RE.test(rawInput))) {
+    return { allowed: false, reason: 'shell_chain_not_allowed' }
+  }
+  const targetBase = extractCommandExecutableBase(parsed.target)
+  const rawBase = rawInput ? extractCommandExecutableBase(rawInput) : ''
+  if (ONCE_ONLY_COMMANDS.has(targetBase) || (rawBase && ONCE_ONLY_COMMANDS.has(rawBase))) {
+    return { allowed: false, reason: 'interpreter_or_shell_once_only' }
+  }
+  return { allowed: true }
+}
+
+/**
+ * Resolves agy execution mode and settings file for a Telegram turn.
+ * Group chats and bot-originated triggers are locked to read-only `plan` mode.
+ */
+export function resolveTurnExecutionPolicy(params: {
+  chatType?: 'private' | 'group' | 'supergroup' | 'channel'
+  isBotSender: boolean
+  defaultMode: string
+  defaultSettingsPath?: string
+  readonlySettingsPath?: string
+  dangerouslySkipPermissions: boolean
+}): {
+  mode: string
+  settingsPath: string | undefined
+  dangerouslySkipPermissions: boolean
+  isReadOnly: boolean
+} {
+  const isGroupOrChannel = params.chatType !== undefined && params.chatType !== 'private'
+  if (isGroupOrChannel || params.isBotSender) {
+    return {
+      mode: 'plan',
+      settingsPath: params.readonlySettingsPath || params.defaultSettingsPath || undefined,
+      dangerouslySkipPermissions: false,
+      isReadOnly: true,
+    }
+  }
+  return {
+    mode: params.defaultMode || 'accept-edits',
+    settingsPath: params.defaultSettingsPath || undefined,
+    dangerouslySkipPermissions: params.dangerouslySkipPermissions,
+    isReadOnly: false,
+  }
+}
+
+/**
+ * Formats the initial private DM permission prompt with full redacted command/target visibility.
+ */
+export function formatPermissionDmMessage(params: {
+  rule: string
+  senderLabel: string
+  chatId: string
+  rawInput?: string
+  inputPreview?: string
+  canAlwaysAllow: boolean
+}): string {
+  const detailSource = (params.rawInput?.trim() || params.inputPreview?.trim() || '').trim()
+  const safeDetail = detailSource ? redactSensitiveOutput(detailSource) : ''
+  const clippedDetail = safeDetail.length > 1500 ? `${safeDetail.slice(0, 1499)}…` : safeDetail
+  const escapedDetail = clippedDetail.replace(/```/g, "'''")
+
+  const lines = [`🔐 Permission (Gemini): ${params.rule}`, `Từ: ${params.senderLabel} (chat ${params.chatId})`]
+  if (escapedDetail) {
+    lines.push(`Chi tiết đầy đủ:\n\`\`\`\n${escapedDetail}\n\`\`\``)
+  }
+  if (!params.canAlwaysAllow) {
+    lines.push('⚠️ Chỉ hỗ trợ Allow (1 lần) — shell/interpreter bị khoá nút Luôn cho phép.')
+  }
+  return lines.join('\n')
+}
+
 /**
  * Permanently grants a single rule in `settingsPath` (for explicit "Always allow").
  */
@@ -413,8 +536,14 @@ export function grantPermissionRuleInFile(
   rawInput?: string,
   home = homedir(),
 ): { ok: true; added: boolean } | { ok: false; reason: string } {
+  const alwaysCheck = canAlwaysAllowRule(rule, rawInput)
+  if (!alwaysCheck.allowed) {
+    return { ok: false, reason: alwaysCheck.reason ?? 'always_allow_forbidden' }
+  }
   const prepared = prepareSettingsWithRule({ settingsPath, rule, rawInput, home })
-  if (!prepared.ok) {return prepared}
+  if (!prepared.ok) {
+    return prepared
+  }
 
   const tmpPath = `${settingsPath}.tmp`
   writeFileSync(tmpPath, JSON.stringify(prepared.settings, null, 2) + '\n', 'utf8')
@@ -434,12 +563,16 @@ export function createEphemeralSettingsWithRule(params: {
   home?: string
 }): { ok: true; tempSettingsPath: string; cleanup: () => void } | { ok: false; reason: string } {
   const prepared = prepareSettingsWithRule(params)
-  if (!prepared.ok) {return prepared}
+  if (!prepared.ok) {
+    return prepared
+  }
 
   mkdirSync(params.tempDir, { recursive: true, mode: 0o700 })
   const safeId = params.requestId.replace(/[^a-zA-Z0-9_-]/g, '') || 'req'
   const tempSettingsPath = join(params.tempDir, `perm-once-${safeId}-${Date.now()}.json`)
-  writeFileSync(tempSettingsPath, JSON.stringify(prepared.settings, null, 2) + '\n', { mode: 0o600 })
+  writeFileSync(tempSettingsPath, JSON.stringify(prepared.settings, null, 2) + '\n', {
+    mode: 0o600,
+  })
 
   const cleanup = (): void => {
     try {
@@ -457,6 +590,7 @@ export type PendingPermissionEntry = {
   description: string
   inputPreview: string
   rawInput?: string
+  canAlwaysAllow?: boolean
   chatId: string
   messageId: number
   senderLabel: string
@@ -487,7 +621,9 @@ export class PendingPermissionStore {
       for (let i = 0; i < 5; i++) {
         id += REQUEST_ID_ALPHABET[Math.floor(Math.random() * REQUEST_ID_ALPHABET.length)]
       }
-      if (!this.entries.has(id)) {return id}
+      if (!this.entries.has(id)) {
+        return id
+      }
     }
     throw new Error('Failed to generate unique permission requestId')
   }

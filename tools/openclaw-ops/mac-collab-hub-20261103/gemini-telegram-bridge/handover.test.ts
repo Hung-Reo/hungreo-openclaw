@@ -59,7 +59,8 @@ describe('executeAutoHandover', () => {
           ok: true,
           conversationId: 'new-conv-99998888',
           reply: 'Đã nạp handover.',
-          totalTokens: 28_500,
+          contextTokens: 28_500,
+          totalTokens: 41_200,
           durationSeconds: 3.4,
         }
       },
@@ -72,20 +73,43 @@ describe('executeAutoHandover', () => {
     expect(calls).toEqual(['summarize:old-conv-11112222', 'clear:111222333', 'seed', 'commit:new-conv-99998888'])
     expect(clearedChatId).toBe('111222333')
     expect(committed?.conversationId).toBe('new-conv-99998888')
+    expect(committed?.contextTokens).toBe(28_500)
     expect(res.ok).toBe(true)
-    if (!res.ok) {return}
+    if (!res.ok) {
+      return
+    }
 
     expect(existsSync(res.backupPath)).toBe(true)
     expect(statSync(res.backupPath).mode & 0o777).toBe(0o600)
     const diskText = readFileSync(res.backupPath, 'utf8')
     expect(diskText).not.toContain('sk-proj-secret1234567890abcdef')
     expect(res.summary).not.toContain('sk-proj-secret1234567890abcdef')
+    expect(res.newContextTokens).toBe(28_500)
+    expect(res.newTokens).toBe(41_200)
 
     const msg = formatHandoverResultMessage(res, 1_048_576)
     expect(msg).toContain('Tự động (vượt ngưỡng token tiết kiệm quota)')
     expect(msg).toContain('old-conv')
     expect(msg).toContain('new-conv')
     expect(msg).toContain('28,500 / 1,048,576')
+    expect(msg).not.toContain('41,200 / 1,048,576')
+  })
+
+  it('does not treat cumulative totalTokens as context size when contextTokens is omitted', () => {
+    const msg = formatHandoverResultMessage(
+      {
+        ok: true,
+        trigger: 'command',
+        oldConversationId: 'old-conv-1',
+        newConversationId: 'new-conv-2',
+        backupPath: '/tmp/handovers/test.md',
+        summary: 'Tóm tắt gọn.',
+        newTokens: 55_000,
+      },
+      1_048_576,
+    )
+    expect(msg).toContain('Phiên mới sạch sẽ 🟢')
+    expect(msg).not.toContain('55,000 / 1,048,576')
   })
 
   it('returns no_thread without touching state when no active conversation exists', async () => {
@@ -106,7 +130,9 @@ describe('executeAutoHandover', () => {
     })
 
     expect(res.ok).toBe(false)
-    if (res.ok) {return}
+    if (res.ok) {
+      return
+    }
     expect(res.stage).toBe('no_thread')
     expect(cleared).toBe(false)
   })
@@ -136,7 +162,9 @@ describe('executeAutoHandover', () => {
     })
 
     expect(res.ok).toBe(false)
-    if (res.ok) {return}
+    if (res.ok) {
+      return
+    }
     expect(res.stage).toBe('summarize')
     expect(cleared).toBe(false)
     expect(seeded).toBe(false)
@@ -168,7 +196,9 @@ describe('executeAutoHandover', () => {
     })
 
     expect(res.ok).toBe(false)
-    if (res.ok) {return}
+    if (res.ok) {
+      return
+    }
     expect(res.stage).toBe('seed')
     expect(cleared).toBe(true)
     expect(committed).toBe(false)

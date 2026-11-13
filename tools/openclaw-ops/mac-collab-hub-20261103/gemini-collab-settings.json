@@ -9,10 +9,7 @@
       "command(git show)",
       "read_file(/Users/hungdinh/collab-bot/work/GEMINI-BOT-REVIEW-20261113.md)"
     ],
-    "ask": [
-      "command(curl)",
-      "command(wget)"
-    ],
+    "ask": ["command(curl)", "command(wget)"],
     "deny": [
       "read_file(/Users/hungdinh/.ssh)",
       "read_file(/Users/hungdinh/.codex)",
@@ -65,8 +62,32 @@
       "command(printenv)",
       "read_file(/Users/hungdinh/.config/apify)",
       "write_file(/Users/hungdinh/.config/apify)",
+      "write_file(/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/gemini-group-readonly-settings.json)",
       "write_file(/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/gemini-telegram-bridge/permissions.ts)",
-      "write_file(/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/x-brief-mac/editor-readonly-settings.json)"
+      "write_file(/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/gemini-telegram-bridge/server.ts)",
+      "write_file(/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/gemini-telegram-bridge/agy-runner.ts)",
+      "write_file(/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/gemini-telegram-bridge/stream-logger.ts)",
+      "write_file(/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/gemini-telegram-bridge/context-status.ts)",
+      "write_file(/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/gemini-telegram-bridge/handover.ts)",
+      "write_file(/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/gemini-telegram-bridge/commands.ts)",
+      "write_file(/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/gemini-telegram-bridge/media.ts)",
+      "write_file(/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/start-gemini-collab.sh)",
+      "write_file(/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/lib/collab-gate.ts)",
+      "write_file(/Users/hungdinh/Development/hungreo-openclaw/tools/openclaw-ops/mac-collab-hub-20261103/x-brief-mac/editor-readonly-settings.json)",
+      "write_file(/Users/hungdinh/Development/hungreo-openclaw/.git)",
+      "write_file(/Users/hungdinh/.zshrc)",
+      "write_file(/Users/hungdinh/.zprofile)",
+      "write_file(/Users/hungdinh/.zshenv)",
+      "write_file(/Users/hungdinh/Library/LaunchAgents)",
+      "command(sh)",
+      "command(bash)",
+      "command(zsh)",
+      "command(dash)",
+      "command(ksh)",
+      "command(csh)",
+      "command(tcsh)",
+      "command(fish)",
+      "command(osascript)"
     ]
   }
 }

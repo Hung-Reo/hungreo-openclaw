@@ -46,7 +46,9 @@ const MIME_EXT_MAP: Record<string, string> = {
  * or an uncompressed image document. Returns null for non-image documents.
  */
 export function extractImageSpec(msg: MessageMediaLike | undefined): ImageSpec | null {
-  if (!msg) {return null}
+  if (!msg) {
+    return null
+  }
   if (msg.photo && msg.photo.length > 0) {
     const best = msg.photo[msg.photo.length - 1]
     return {
@@ -77,11 +79,17 @@ export function pickAlbumRepresentative<T extends { message?: MessageMediaLike }
   const withCaptionAndEntities = items.find(
     it => Boolean(it.message?.caption?.trim()) && (it.message?.caption_entities?.length ?? 0) > 0,
   )
-  if (withCaptionAndEntities) {return withCaptionAndEntities}
+  if (withCaptionAndEntities) {
+    return withCaptionAndEntities
+  }
   const withCaption = items.find(it => Boolean(it.message?.caption?.trim()))
-  if (withCaption) {return withCaption}
+  if (withCaption) {
+    return withCaption
+  }
   const withReply = items.find(it => Boolean(it.message?.reply_to_message))
-  if (withReply) {return withReply}
+  if (withReply) {
+    return withReply
+  }
   return items[0]
 }
 
@@ -108,7 +116,9 @@ export function formatMediaPrompt(params: {
 }): string {
   const sections: string[] = []
   const text = params.rawText.trim()
-  if (text) {sections.push(text)}
+  if (text) {
+    sections.push(text)
+  }
 
   if (params.voicePath) {
     const dur = params.voiceDuration ?? 0
@@ -166,7 +176,9 @@ export class MediaGroupBatcher<T> {
 
   private flush(key: string, onFlush: (items: T[]) => void): void {
     const bucket = this.buckets.get(key)
-    if (!bucket) {return}
+    if (!bucket) {
+      return
+    }
     this.buckets.delete(key)
     clearTimeout(bucket.timer)
     onFlush(bucket.items)

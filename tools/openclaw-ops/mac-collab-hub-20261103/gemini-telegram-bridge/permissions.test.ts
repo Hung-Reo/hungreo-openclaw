@@ -5,23 +5,28 @@ import { join } from 'node:path'
 import {
   MODEL_PRESETS,
   PendingPermissionStore,
+  canAlwaysAllowRule,
   createEphemeralSettingsWithRule,
   derivePermissionCandidate,
   formatHardDenyNotice,
+  formatPermissionDmMessage,
   grantPermissionRuleInFile,
   hasPermissionDenial,
   isRuleBlockedByDeny,
   resolveModelPreset,
+  resolveTurnExecutionPolicy,
 } from './permissions.ts'
 import type { AgyStreamResult } from './stream-logger.ts'
 
 const tempDirs: string[] = []
 
-function makeTempSettings(overrides: {
-  allow?: string[]
-  ask?: string[]
-  deny?: string[]
-} = {}): string {
+function makeTempSettings(
+  overrides: {
+    allow?: string[]
+    ask?: string[]
+    deny?: string[]
+  } = {},
+): string {
   const dir = mkdtempSync(join(tmpdir(), 'gemini-perm-test-'))
   tempDirs.push(dir)
   const settingsPath = join(dir, 'gemini-collab-settings.json')
@@ -126,7 +131,9 @@ describe('isRuleBlockedByDeny', () => {
     expect(isRuleBlockedByDeny(settingsPath, 'command(/bin/rm)', '/bin/rm /tmp/x').blocked).toBe(true)
     expect(isRuleBlockedByDeny(settingsPath, 'command(ssh)', 'ssh root@vps').blocked).toBe(true)
     expect(isRuleBlockedByDeny(settingsPath, 'read_file(/Users/hungdinh/.ssh/id_ed25519)').blocked).toBe(true)
-    expect(isRuleBlockedByDeny(settingsPath, 'read_file(~/.ssh/config)', undefined, '/Users/hungdinh').blocked).toBe(true)
+    expect(isRuleBlockedByDeny(settingsPath, 'read_file(~/.ssh/config)', undefined, '/Users/hungdinh').blocked).toBe(
+      true,
+    )
     expect(
       isRuleBlockedByDeny(
         settingsPath,
@@ -184,7 +191,9 @@ describe('createEphemeralSettingsWithRule', () => {
       rawInput: 'curl -I https://example.com',
     })
     expect(ephem.ok).toBe(true)
-    if (!ephem.ok) {return}
+    if (!ephem.ok) {
+      return
+    }
 
     // Base settings stays untouched
     expect(readFileSync(settingsPath, 'utf8')).toBe(baseBefore)
@@ -309,5 +318,195 @@ describe('formatHardDenyNotice', () => {
     })
     expect(msgBackticks).toContain("`echo 'whoami'`")
     expect(msgBackticks).not.toContain('Công cụ:')
+  })
+})
+
+describe('canAlwaysAllowRule & interpreter/shell protections', () => {
+  it('blocks permanent always-allow for shells and script interpreters while allowing once-only ephemeral grant for interpreters', () => {
+    for (const rule of [
+      'command(bash)',
+      'command(sh)',
+      'command(zsh)',
+      'command(osascript)',
+      'command(python)',
+      'command(python3)',
+      'command(/usr/bin/python3)',
+      'command(node)',
+      'command(bun)',
+      'command(deno)',
+      'command(perl)',
+      'command(ruby)',
+      'command(php)',
+      'command(lua)',
+    ]) {
+      expect(canAlwaysAllowRule(rule).allowed).toBe(false)
+    }
+    expect(canAlwaysAllowRule('command(curl)').allowed).toBe(true)
+    expect(canAlwaysAllowRule('command(git status)').allowed).toBe(true)
+
+    const settingsPath = makeTempSettings({
+      deny: ['command(bash)', 'command(sh)'],
+    })
+
+    // Permanent grant MUST reject interpreters
+    const pyPerm = grantPermissionRuleInFile(settingsPath, 'command(python3)', 'python3 -c "print(1)"')
+    expect(pyPerm.ok).toBe(false)
+
+    // Once-only ephemeral grant MUST still work for python3/bun if not in deny
+    const ephem = createEphemeralSettingsWithRule({
+      settingsPath,
+      tempDir: tmpdir(),
+      requestId: 'once-py-1',
+      rule: 'command(python3)',
+      rawInput: 'python3 -c "print(1)"',
+    })
+    expect(ephem.ok).toBe(true)
+    if (ephem.ok) {
+      const parsed = JSON.parse(readFileSync(ephem.tempSettingsPath, 'utf8')) as {
+        permissions: { allow: string[] }
+      }
+      expect(parsed.permissions.allow).toContain('command(python3)')
+      ephem.cleanup()
+    }
+
+    // Hard-denied shell MUST stay blocked even for once-only
+    const shEphem = createEphemeralSettingsWithRule({
+      settingsPath,
+      tempDir: tmpdir(),
+      requestId: 'once-bash-1',
+      rule: 'command(bash)',
+      rawInput: 'bash -c id',
+    })
+    expect(shEphem.ok).toBe(false)
+  })
+})
+
+describe('resolveTurnExecutionPolicy', () => {
+  it('keeps human private DM in accept-edits and locks all groups, channels, and bot senders to plan + readonly settings', () => {
+    const dmHuman = resolveTurnExecutionPolicy({
+      chatType: 'private',
+      isBotSender: false,
+      defaultMode: 'accept-edits',
+      defaultSettingsPath: '/tmp/collab.json',
+      readonlySettingsPath: '/tmp/group-readonly.json',
+      dangerouslySkipPermissions: true,
+    })
+    expect(dmHuman).toEqual({
+      mode: 'accept-edits',
+      settingsPath: '/tmp/collab.json',
+      dangerouslySkipPermissions: true,
+      isReadOnly: false,
+    })
+
+    for (const scenario of [
+      { chatType: 'group' as const, isBotSender: false },
+      { chatType: 'supergroup' as const, isBotSender: false },
+      { chatType: 'channel' as const, isBotSender: true },
+      { chatType: 'private' as const, isBotSender: true },
+    ]) {
+      const policy = resolveTurnExecutionPolicy({
+        chatType: scenario.chatType,
+        isBotSender: scenario.isBotSender,
+        defaultMode: 'accept-edits',
+        defaultSettingsPath: '/tmp/collab.json',
+        readonlySettingsPath: '/tmp/group-readonly.json',
+        dangerouslySkipPermissions: true,
+      })
+      expect(policy).toEqual({
+        mode: 'plan',
+        settingsPath: '/tmp/group-readonly.json',
+        dangerouslySkipPermissions: false,
+        isReadOnly: true,
+      })
+    }
+  })
+})
+
+describe('formatPermissionDmMessage', () => {
+  it('renders redacted full command/target inline on initial DM prompt and warns when always-allow is disabled', () => {
+    const fakeToken = ['apify', 'api', 'demo000000000000'].join('_')
+    const msg = formatPermissionDmMessage({
+      rule: 'command(python3)',
+      senderLabel: '@user_demo',
+      chatId: '900001',
+      rawInput: `python3 fetch.py --token ${fakeToken}`,
+      inputPreview: '{"CommandLine":"python3 fetch.py"}',
+      canAlwaysAllow: false,
+    })
+    expect(msg).toContain('🔐 Permission (Gemini): command(python3)')
+    expect(msg).toContain('Chi tiết đầy đủ:')
+    expect(msg).toContain('python3 fetch.py --token [REDACTED_APIFY_TOKEN]')
+    expect(msg).not.toContain(fakeToken)
+    expect(msg).toContain('Chỉ hỗ trợ Allow (1 lần)')
+  })
+})
+
+describe('checked-in settings hardening (items 5.1, 5.2, 5.3)', () => {
+  const hubDir = join(import.meta.dir, '..')
+  const collabSettingsPath = join(hubDir, 'gemini-collab-settings.json')
+  const groupReadonlyPath = join(hubDir, 'gemini-group-readonly-settings.json')
+
+  it('gemini-collab-settings.json hard-denies .git, bridge core files, LaunchAgents, and shells while leaving interpreters once-eligible', () => {
+    const repoRoot = join(hubDir, '..', '..')
+    for (const [rule, raw] of [
+      ['write_file(/Users/hungdinh/Development)', join(repoRoot, '.git', 'config')],
+      ['write_file(/Users/hungdinh/Development)', join(hubDir, 'gemini-telegram-bridge', 'server.ts')],
+      ['write_file(/Users/hungdinh/Development)', join(hubDir, 'gemini-telegram-bridge', 'agy-runner.ts')],
+      ['write_file(/Users/hungdinh/Development)', join(hubDir, 'gemini-telegram-bridge', 'stream-logger.ts')],
+      ['write_file(/Users/hungdinh/Development)', join(hubDir, 'gemini-telegram-bridge', 'context-status.ts')],
+      ['write_file(/Users/hungdinh/Development)', join(hubDir, 'gemini-telegram-bridge', 'handover.ts')],
+      ['write_file(/Users/hungdinh/Development)', join(hubDir, 'gemini-telegram-bridge', 'commands.ts')],
+      ['write_file(/Users/hungdinh/Development)', join(hubDir, 'gemini-telegram-bridge', 'media.ts')],
+      ['write_file(/Users/hungdinh/Development)', join(hubDir, 'gemini-telegram-bridge', 'permissions.ts')],
+      ['write_file(/Users/hungdinh/Development)', join(hubDir, 'lib', 'collab-gate.ts')],
+      ['write_file(/Users/hungdinh/Development)', join(hubDir, 'start-gemini-collab.sh')],
+      ['write_file(/Users/hungdinh/Development)', join(hubDir, 'gemini-group-readonly-settings.json')],
+      ['write_file(/Users/hungdinh/Development)', join(hubDir, 'x-brief-mac', 'editor-readonly-settings.json')],
+      ['write_file(/Users/hungdinh/.zshrc)', '/Users/hungdinh/.zshrc'],
+      ['write_file(/Users/hungdinh/Library/LaunchAgents)', '/Users/hungdinh/Library/LaunchAgents/com.test.plist'],
+      ['command(bash)', 'bash -c id'],
+      ['command(sh)', 'sh -c id'],
+      ['command(zsh)', 'zsh -c id'],
+      ['command(osascript)', 'osascript -e "beep"'],
+    ] as const) {
+      expect(isRuleBlockedByDeny(collabSettingsPath, rule, raw).blocked).toBe(true)
+    }
+
+    // Interpreters remain un-denied so Allow (1 lần) in DM can work, while permanent always-allow is blocked
+    expect(isRuleBlockedByDeny(collabSettingsPath, 'command(python3)', 'python3 -V').blocked).toBe(false)
+    expect(canAlwaysAllowRule('command(python3)').allowed).toBe(false)
+  })
+
+  it('gemini-group-readonly-settings.json uses ask:[] and blocks writes + shells + interpreters + secrets while allowing plan.md & safe reads', () => {
+    const parsed = JSON.parse(readFileSync(groupReadonlyPath, 'utf8')) as {
+      permissions: { allow: string[]; ask: string[]; deny: string[] }
+    }
+    expect(parsed.permissions.ask).toEqual([])
+    expect(parsed.permissions.allow).toContain('read_file(/Users/hungdinh/Development/hungreo-openclaw)')
+    expect(parsed.permissions.allow).toContain('command(git status)')
+    expect(isRuleBlockedByDeny(groupReadonlyPath, 'command(python3)', 'python3 -V').blocked).toBe(true)
+    expect(isRuleBlockedByDeny(groupReadonlyPath, 'command(node)', 'node -v').blocked).toBe(true)
+    expect(isRuleBlockedByDeny(groupReadonlyPath, 'command(bash)', 'bash -c id').blocked).toBe(true)
+    expect(
+      isRuleBlockedByDeny(groupReadonlyPath, 'read_file(/Users/hungdinh/.ssh)', '/Users/hungdinh/.ssh/id_ed25519')
+        .blocked,
+    ).toBe(true)
+    expect(
+      isRuleBlockedByDeny(
+        groupReadonlyPath,
+        'write_file(/Users/hungdinh/Development/hungreo-openclaw/README.md)',
+        '/Users/hungdinh/Development/hungreo-openclaw/README.md',
+      ).blocked,
+    ).toBe(true)
+    // Antigravity plan-mode artifacts under ~/.gemini/antigravity-cli/brain must stay unblocked
+    expect(parsed.permissions.deny).not.toContain('write_file(/Users/hungdinh)')
+    expect(parsed.permissions.deny).not.toContain('write_file(/Users/hungdinh/.gemini)')
+    expect(
+      isRuleBlockedByDeny(
+        groupReadonlyPath,
+        'write_file(/Users/hungdinh/.gemini/antigravity-cli/brain/test/plan.md)',
+        '/Users/hungdinh/.gemini/antigravity-cli/brain/test/plan.md',
+      ).blocked,
+    ).toBe(false)
   })
 })

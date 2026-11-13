@@ -21,6 +21,7 @@ export type HandoverSeedResult = {
   ok: boolean
   conversationId?: string
   reply?: string
+  contextTokens?: number
   totalTokens?: number
   durationSeconds?: number
   error?: string
@@ -34,6 +35,7 @@ export type AutoHandoverResult =
       newConversationId: string
       backupPath: string
       summary: string
+      newContextTokens?: number
       newTokens?: number
       newReply?: string
     }
@@ -49,7 +51,9 @@ export type AutoHandoverResult =
 
 function clipTurnText(raw: string, maxChars: number): string {
   const safe = redactSensitiveOutput(raw).trim()
-  if (safe.length <= maxChars) {return safe}
+  if (safe.length <= maxChars) {
+    return safe
+  }
   return `${safe.slice(0, Math.max(1, maxChars - 1))}…`
 }
 
@@ -67,7 +71,9 @@ export class RecentTurnBuffer {
 
   record(chatId: string, turn: HandoverTurnSnippet): void {
     const userText = clipTurnText(turn.userText, this.maxFieldChars)
-    if (!userText) {return}
+    if (!userText) {
+      return
+    }
     const assistantReply = turn.assistantReply ? clipTurnText(turn.assistantReply, this.maxFieldChars) : undefined
     const entry: HandoverTurnSnippet = {
       senderLabel: redactSensitiveOutput(turn.senderLabel.trim()) || 'user',
@@ -92,7 +98,9 @@ export class RecentTurnBuffer {
 }
 
 function formatRecentTurnsSection(recentTurns?: readonly HandoverTurnSnippet[]): string {
-  if (!recentTurns || recentTurns.length === 0) {return ''}
+  if (!recentTurns || recentTurns.length === 0) {
+    return ''
+  }
   const lines = recentTurns.map((turn, idx) => {
     const sender = redactSensitiveOutput(turn.senderLabel.trim()) || 'user'
     const userText = redactSensitiveOutput(turn.userText.trim())
@@ -138,10 +146,7 @@ export function buildHandoverSummaryPrompt(): string {
 /**
  * Builds the first message sent to a newly reset thread so it immediately loads the handover.
  */
-export function buildHandoverSeedPrompt(
-  summaryText: string,
-  recentTurns?: readonly HandoverTurnSnippet[],
-): string {
+export function buildHandoverSeedPrompt(summaryText: string, recentTurns?: readonly HandoverTurnSnippet[]): string {
   const safeSummary = redactSensitiveOutput(summaryText.trim())
   const recentSection = formatRecentTurnsSection(recentTurns)
   const taskInstruction =
@@ -189,6 +194,7 @@ export async function executeAutoHandover(params: {
     chatId: string
     conversationId: string
     modelId: string
+    contextTokens?: number
     totalTokens?: number
     durationSeconds?: number
   }) => void
@@ -262,6 +268,7 @@ export async function executeAutoHandover(params: {
     chatId,
     conversationId: seedRes.conversationId,
     modelId: params.modelId,
+    contextTokens: seedRes.contextTokens,
     totalTokens: seedRes.totalTokens,
     durationSeconds: seedRes.durationSeconds,
   })
@@ -273,6 +280,7 @@ export async function executeAutoHandover(params: {
     newConversationId: seedRes.conversationId,
     backupPath,
     summary: safeSummary,
+    newContextTokens: seedRes.contextTokens,
     newTokens: seedRes.totalTokens,
     newReply: seedRes.reply ? redactSensitiveOutput(seedRes.reply) : undefined,
   }
@@ -314,12 +322,14 @@ export function formatHandoverResultMessage(
   const oldShort = result.oldConversationId.slice(0, 8)
   const newShort = result.newConversationId.slice(0, 8)
   const tokenLine =
-    typeof result.newTokens === 'number'
-      ? `${Math.round(result.newTokens).toLocaleString('en-US')} / ${Math.round(windowTokens).toLocaleString('en-US')} tokens (**${((result.newTokens / windowTokens) * 100).toFixed(1)}%**) 🟢`
+    typeof result.newContextTokens === 'number'
+      ? `${Math.round(result.newContextTokens).toLocaleString('en-US')} / ${Math.round(windowTokens).toLocaleString('en-US')} tokens (**${((result.newContextTokens / windowTokens) * 100).toFixed(1)}%**) 🟢`
       : 'Phiên mới sạch sẽ 🟢'
 
   const preview =
-    result.summary.length > 2600 ? `${result.summary.slice(0, 2600)}\n…(xem đủ tại \`${result.backupPath}\`)` : result.summary
+    result.summary.length > 2600
+      ? `${result.summary.slice(0, 2600)}\n…(xem đủ tại \`${result.backupPath}\`)`
+      : result.summary
 
   return (
     `♻️ **Đã Handover & Mở phiên mới thành công!**\n` +
