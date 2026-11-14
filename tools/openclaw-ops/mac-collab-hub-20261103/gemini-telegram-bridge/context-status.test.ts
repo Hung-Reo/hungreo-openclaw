@@ -8,6 +8,7 @@ import {
   DEFAULT_WARN_TOKEN_THRESHOLDS,
   ThreadStatsStore,
   evaluateContextWarning,
+  formatBridgeStartedAtVnt,
   formatContextStatusMessage,
   resolveContextWindowTokens,
   resolveQuotaPolicy,
@@ -176,12 +177,16 @@ describe('ThreadStatsStore', () => {
 
 describe('formatContextStatusMessage', () => {
   it('formats real context separately from cumulative tokens with 300k quota budget and health badge', () => {
+    const startedLabel = formatBridgeStartedAtVnt(new Date('2026-11-14T00:58:00.000Z'))
+    expect(startedLabel).toBe('07:58 14/11/2026 (VNT)')
+
     const msg = formatContextStatusMessage({
       botUsername: 'hungreo_gemini_bot',
       currentModelId: 'gemini-4-hydrogen-high',
       currentModelLabel: 'Gemini 4 Hydrogen (High)',
       conversationId: 'conv-1234567890abcdef',
       contextWindowTokens: 1_048_576,
+      bridgeStartedLabel: startedLabel,
       stats: {
         conversationId: 'conv-1234567890abcdef',
         modelId: 'gemini-4-hydrogen-high',
@@ -197,6 +202,7 @@ describe('formatContextStatusMessage', () => {
     })
     expect(msg).toContain('@hungreo_gemini_bot')
     expect(msg).toContain('Gemini 4 Hydrogen (High)')
+    expect(msg).toContain('- **Bridge started:** `07:58 14/11/2026 (VNT)`')
     expect(msg).toContain('165,000 / 300,000')
     expect(msg).toContain('`412,000` tokens *(input mới + output, không phải kích thước context)*')
     expect(msg).toContain('Nên handover sớm')

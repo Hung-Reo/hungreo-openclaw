@@ -233,8 +233,10 @@ describe('handover prompt builders', () => {
     expect(seed).toContain('Em đã ghi nhận format Rùa.')
     expect(seed).not.toContain('sk-proj-secret1234567890abcdef')
 
-    const initial = buildTelegramInitialPrompt('@hungdinh', 'Xin chào')
+    const initial = buildTelegramInitialPrompt('@hungdinh', 'Xin chào', '07:58 14/11/2026 (VNT)')
     expect(initial).toContain('&&')
+    expect(initial).toContain('Tuyệt đối KHÔNG suy đoán trạng thái runtime/restart')
+    expect(initial).toContain('[Bridge started: 07:58 14/11/2026 (VNT)]')
   })
 
   it('retains bounded redacted recent turns in RecentTurnBuffer and clears by chatId', () => {

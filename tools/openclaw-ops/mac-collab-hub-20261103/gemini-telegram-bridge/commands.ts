@@ -15,6 +15,7 @@ export const GEMINI_BOT_COMMANDS: readonly TelegramBotCommand[] = [
   { command: 'status', description: 'Xem model, phiên & ngân sách token' },
   { command: 'handover', description: 'Tóm tắt handover & mở phiên mới' },
   { command: 'x_brief', description: 'Chạy thử Bản tin X Đối Chứng ngay' },
+  { command: 'idea_miner', description: 'Tổng hợp ý tưởng & retro tuần qua' },
   { command: 'model', description: 'Xem hoặc đổi model Gemini' },
   { command: 'reset_thread', description: 'Xoá trắng context phiên hiện tại' },
   { command: 'start', description: 'Giới thiệu @hungreo_gemini_bot' },

@@ -30,6 +30,8 @@ import { fileURLToPath } from 'node:url'
 import { Bot, InlineKeyboard, type Context } from 'grammy'
 import type { ReactionTypeEmoji } from 'grammy/types'
 import { formatChunks, isEntityParseError, stripMdv2 } from '../claude-telegram-plugin/telegram-format.ts'
+import { runIdeaMinerPipeline } from '../idea-miner-mac/runner.ts'
+import { startIdeaMinerScheduler } from '../idea-miner-mac/scheduler.ts'
 import {
   BotLoopGuard,
   evaluateInboundGate,
@@ -43,6 +45,7 @@ import { buildAgyArgs, resolveAgyTimeoutConfig, runAgyProcess, type AgyProcessRe
 import { registerGeminiBotCommands } from './commands.ts'
 import {
   ThreadStatsStore,
+  formatBridgeStartedAtVnt,
   formatContextStatusMessage,
   resolveQuotaPolicy,
   type ContextWarningAction,
@@ -96,9 +99,12 @@ const EPHEMERAL_PERMS_DIR = join(STATE_DIR, 'tmp-perms')
 const PID_FILE = join(STATE_DIR, 'bot.pid')
 const QUOTA_POLICY = resolveQuotaPolicy(process.env)
 const CONTEXT_WINDOW_TOKENS = QUOTA_POLICY.contextWindowTokens
+const BRIDGE_STARTED_LABEL = formatBridgeStartedAtVnt(new Date())
 const threadStatsStore = new ThreadStatsStore(THREAD_STATS_FILE)
 
 const WORKSPACE_DIR = process.env.COLLAB_WORKSPACE_DIR ?? '/Users/hungdinh/Development/hungreo-openclaw'
+const BRAIN_DIR = process.env.ANTIGRAVITY_BRAIN_DIR ?? join(homedir(), '.gemini', 'antigravity-cli', 'brain')
+const KB_LESSONS_DIR = process.env.KB_LESSONS_DIR ?? join(WORKSPACE_DIR, 'kb', 'lessons')
 const AGY_BIN = process.env.AGY_BIN ?? join(homedir(), '.gemini', 'bin', 'agy')
 let currentModel = process.env.GEMINI_MODEL ?? 'gemini-4-hydrogen-high' // default fast & capable
 const GEMINI_MODE = process.env.GEMINI_MODE ?? 'accept-edits'
@@ -362,8 +368,8 @@ async function runGeminiTurn(params: {
   const existingConvId = threads[params.chatId]
 
   const prompt = existingConvId
-    ? `[${params.senderLabel}]: ${params.userText}`
-    : buildTelegramInitialPrompt(params.senderLabel, params.userText)
+    ? `[Bridge started: ${BRIDGE_STARTED_LABEL}]\n[${params.senderLabel}]: ${params.userText}`
+    : buildTelegramInitialPrompt(params.senderLabel, params.userText, BRIDGE_STARTED_LABEL)
 
   const policy = resolveTurnExecutionPolicy({
     chatType: params.chatType,
@@ -463,6 +469,8 @@ const albumBatcher = new MediaGroupBatcher<Context>(ALBUM_DEBOUNCE_MS, MAX_ALBUM
 const recentTurnBuffer = new RecentTurnBuffer(3, 600)
 let xBriefRunning = false
 let xBriefScheduler: { stop: () => void } | undefined
+let ideaMinerRunning = false
+let ideaMinerScheduler: { stop: () => void } | undefined
 
 async function runAndDeliverXBrief(params: {
   mode: 'scheduled' | 'test'
@@ -525,6 +533,75 @@ async function runAndDeliverXBrief(params: {
     )
   } finally {
     xBriefRunning = false
+  }
+}
+
+async function runAndDeliverIdeaMiner(params: {
+  mode: 'scheduled' | 'test'
+  targetChatIds: readonly string[]
+  replyToMsgId?: number
+}): Promise<void> {
+  if (ideaMinerRunning) {
+    if (params.mode === 'test' && params.targetChatIds[0]) {
+      await bot.api
+        .sendMessage(params.targetChatIds[0], '⏳ Báo cáo Idea & Retro tuần đang chạy, anh đợi chút nhé.')
+        .catch(() => {})
+    }
+    return
+  }
+
+  ideaMinerRunning = true
+  try {
+    const res = await runIdeaMinerPipeline({
+      stateDir: STATE_DIR,
+      brainDir: BRAIN_DIR,
+      lessonsDir: KB_LESSONS_DIR,
+      mode: params.mode,
+      runEditorPrompt: async prompt => {
+        const readonlySettings = existsSync(X_BRIEF_READONLY_SETTINGS_FILE)
+          ? X_BRIEF_READONLY_SETTINGS_FILE
+          : READONLY_SETTINGS_FILE || GEMINI_SETTINGS_FILE || undefined
+        const agyRes = await invokeAgyPrompt(prompt, undefined, readonlySettings, {
+          mode: 'plan',
+          dangerouslySkipPermissions: false,
+        })
+        if (hasPermissionDenial(agyRes)) {
+          logTimeline(
+            'IdeaMiner',
+            '🛡️ blocked tool attempt during read-only Idea Miner synthesis; falling back cleanly',
+          )
+          return { ok: false, error: 'blocked_tool_attempt_in_readonly_editor' }
+        }
+        return agyRes.response
+          ? { ok: true, text: agyRes.response }
+          : { ok: false, error: agyRes.error ?? 'empty_response' }
+      },
+    })
+
+    if (!res.ok) {
+      const errMsg = `⚠️ **Idea & Retro tuần (${params.mode}) chưa chạy được (${res.stage}):**\n${res.error}`
+      for (const cid of params.targetChatIds) {
+        await sendFormattedReply(cid, errMsg, 4000, params.replyToMsgId).catch(() => {})
+      }
+      if (params.mode === 'scheduled') {
+        throw new Error(res.error)
+      }
+      return
+    }
+
+    if (res.skipped) {
+      return
+    }
+
+    for (const cid of params.targetChatIds) {
+      await sendFormattedReply(cid, res.message, 4000, params.replyToMsgId)
+    }
+    logTimeline(
+      'IdeaMiner',
+      `📤 sent ${params.mode} report (week=${res.report.weekKey}, ideas=${res.report.ideas.length}, skills=${res.report.skillProposals.length}, fallback=${res.report.usedFallbackEditor}, ${res.durationSeconds.toFixed(1)}s)`,
+    )
+  } finally {
+    ideaMinerRunning = false
   }
 }
 
@@ -1065,6 +1142,7 @@ bot.command('status', async ctx => {
     warnStartTokens: QUOTA_POLICY.warnTokenThresholds[0],
     autoHandoverTokens: QUOTA_POLICY.autoHandoverTokens,
     stats,
+    bridgeStartedLabel: BRIDGE_STARTED_LABEL,
   })
   await sendFormattedReply(chatId, statusText, access.textChunkLimit ?? 4000, ctx.message?.message_id)
 })
@@ -1131,6 +1209,33 @@ bot.command('x_brief', async ctx => {
     ctx.message?.message_id ? { reply_parameters: { message_id: ctx.message.message_id } } : {},
   )
   void runAndDeliverXBrief({
+    mode: 'test',
+    targetChatIds: [chatId],
+    replyToMsgId: ctx.message?.message_id,
+  })
+})
+
+bot.command('idea_miner', async ctx => {
+  const access = loadAccess()
+  const senderId = String(ctx.from?.id ?? '')
+  if (!ctx.from || ctx.from.is_bot || !access.allowFrom.includes(senderId)) {
+    return
+  }
+
+  const chatId = String(ctx.chat.id)
+  if (ideaMinerRunning) {
+    await ctx.reply(
+      '⏳ Báo cáo Idea & Retro tuần đang chạy, anh đợi chút nhé.',
+      ctx.message?.message_id ? { reply_parameters: { message_id: ctx.message.message_id } } : {},
+    )
+    return
+  }
+
+  await ctx.reply(
+    '🧠 Đang quét handover + transcript 7 ngày qua & tổng hợp Idea/Retro tuần (chế độ chỉ đọc)...',
+    ctx.message?.message_id ? { reply_parameters: { message_id: ctx.message.message_id } } : {},
+  )
+  void runAndDeliverIdeaMiner({
     mode: 'test',
     targetChatIds: [chatId],
     replyToMsgId: ctx.message?.message_id,
@@ -1426,6 +1531,7 @@ function shutdown(): void {
   }
   shuttingDown = true
   xBriefScheduler?.stop()
+  ideaMinerScheduler?.stop()
   albumBatcher.clearAll()
   try {
     if (parseInt(readFileSync(PID_FILE, 'utf8'), 10) === process.pid) {
@@ -1467,6 +1573,23 @@ void (async () => {
             return
           }
           await runAndDeliverXBrief({
+            mode: 'scheduled',
+            targetChatIds: access.allowFrom,
+          })
+        },
+      })
+      ideaMinerScheduler = startIdeaMinerScheduler({
+        statePath: join(STATE_DIR, 'idea-miner', 'schedule-state.json'),
+        targetWeekday: 'Mon',
+        targetHour: 7,
+        targetMinute: 30,
+        log: msg => logTimeline('IdeaMiner', msg),
+        onTrigger: async () => {
+          const access = loadAccess()
+          if (access.allowFrom.length === 0) {
+            return
+          }
+          await runAndDeliverIdeaMiner({
             mode: 'scheduled',
             targetChatIds: access.allowFrom,
           })

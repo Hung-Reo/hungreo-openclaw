@@ -277,6 +277,23 @@ export class ThreadStatsStore {
 }
 
 /**
+ * Formats a compact VNT startup timestamp (`HH:mm DD/MM/YYYY (VNT)`) for bridge status & prompt labels.
+ */
+export function formatBridgeStartedAtVnt(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(date)
+  const get = (type: string): string => parts.find(p => p.type === type)?.value ?? '00'
+  return `${get('hour')}:${get('minute')} ${get('day')}/${get('month')}/${get('year')} (VNT)`
+}
+
+/**
  * Formats the Telegram `/status` response with model, active thread, and token quota budget.
  */
 export function formatContextStatusMessage(params: {
@@ -288,6 +305,7 @@ export function formatContextStatusMessage(params: {
   warnStartTokens?: number
   autoHandoverTokens?: number
   stats?: ThreadStats
+  bridgeStartedLabel?: string
 }): string {
   const windowTokens =
     params.contextWindowTokens && params.contextWindowTokens > 0
@@ -309,6 +327,9 @@ export function formatContextStatusMessage(params: {
     `📊 **Trạng thái ${botHandle}**`,
     `- **Model:** ${params.currentModelLabel} (\`${params.currentModelId}\`)`,
   ]
+  if (params.bridgeStartedLabel?.trim()) {
+    lines.push(`- **Bridge started:** \`${params.bridgeStartedLabel.trim()}\``)
+  }
 
   if (!params.conversationId) {
     lines.push('- **Phiên:** Chưa có phiên (tin nhắn tới sẽ mở mới)')

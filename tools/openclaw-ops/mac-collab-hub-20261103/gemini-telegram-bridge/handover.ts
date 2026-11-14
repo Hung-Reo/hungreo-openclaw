@@ -113,13 +113,15 @@ function formatRecentTurnsSection(recentTurns?: readonly HandoverTurnSnippet[]):
 /**
  * Builds the initial Telegram system prompt used when opening any fresh conversation thread.
  */
-export function buildTelegramInitialPrompt(senderLabel: string, userText: string): string {
+export function buildTelegramInitialPrompt(senderLabel: string, userText: string, bridgeStartedLabel?: string): string {
+  const runtimeLine = bridgeStartedLabel?.trim() ? `[Bridge started: ${bridgeStartedLabel.trim()}]\n` : ''
   return (
     `Bạn là trợ lý AI @hungreo_gemini_bot trên Telegram của anh Hưng (@hungdinh) và nhóm cộng tác.\n` +
     `Hãy giao tiếp tự nhiên, thân thiện, súc tích và hữu ích bằng tiếng Việt.\n` +
     `Định dạng câu trả lời phù hợp với Telegram: chia đoạn ngắn gọn dễ đọc trên điện thoại, dùng **bold** để nhấn mạnh ý chính, thêm emoji tự nhiên cho sinh động, dùng \`code\` cho lệnh/đường dẫn. Không tự escape ký tự Markdown vì bridge sẽ tự chuyển sang MarkdownV2.\n` +
-    `Nếu là câu chào hỏi, giao tiếp thông thường hoặc câu hỏi nghiệp vụ/tư vấn, hãy trả lời bằng lời nói tự nhiên, không tự ý chạy tool lệnh shell thừa thãi. Khi cần dùng lệnh shell, chỉ chạy lệnh đơn, tuyệt đối không ghép chuỗi (&&, ||, ;, |) để tránh bị chính sách an toàn chặn.\n\n` +
-    `Tin nhắn từ ${senderLabel}: ${userText}`
+    `Nếu là câu chào hỏi, giao tiếp thông thường hoặc câu hỏi nghiệp vụ/tư vấn, hãy trả lời bằng lời nói tự nhiên, không tự ý chạy tool lệnh shell thừa thãi. Khi cần dùng lệnh shell, chỉ chạy lệnh đơn, tuyệt đối không ghép chuỗi (&&, ||, ;, |) để tránh bị chính sách an toàn chặn.\n` +
+    `Tuyệt đối KHÔNG suy đoán trạng thái runtime/restart, mốc thời gian tiến trình hay kết quả lệnh chưa chạy; mọi nhận định đã/chưa restart phải dựa trên nhãn [Bridge started: ...] hoặc bằng chứng đọc trực tiếp. Nếu thiếu bằng chứng, hãy nói thẳng "em chưa kiểm được" và hỏi anh Hưng.\n\n` +
+    `${runtimeLine}Tin nhắn từ ${senderLabel}: ${userText}`
   )
 }
 
