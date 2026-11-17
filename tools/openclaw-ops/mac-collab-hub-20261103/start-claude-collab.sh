@@ -17,6 +17,7 @@ export TELEGRAM_INBOX_DIR="${TELEGRAM_INBOX_DIR:-$HOME/collab-bot/inbox}"
 export TELEGRAM_INBOX_RETENTION_DAYS="${TELEGRAM_INBOX_RETENTION_DAYS:-7}"
 
 CLAUDE_BIN="$HOME/.local/bin/claude"
+SECURITY_BIN="${COLLAB_SECURITY_BIN:-/usr/bin/security}"
 if [[ ! -x "$CLAUDE_BIN" ]]; then
   echo "Không tìm thấy $CLAUDE_BIN" >&2
   exit 1
@@ -29,8 +30,16 @@ fi
 
 # 1) Ưu tiên token subscription dài hạn trong Keychain (để autostart chạy được khi Desktop chưa mở)
 if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
-  KC_TOK="$(/usr/bin/security find-generic-password -s "claude-collab-oauth" -a "$USER" -w 2>/dev/null || true)"
+  KC_TOK="$("$SECURITY_BIN" find-generic-password -s "claude-collab-oauth" -a "$USER" -w 2>/dev/null || true)"
   if [[ -n "$KC_TOK" ]]; then
+    # 17/11/2026: Keychain từng chứa chuỗi 13 ký tự / token copy thiếu dòng đầu → bot chạy với token hỏng.
+    # Token `setup-token` dạng sk-ant-oat01-…, dài ~108. Sai dạng thì dừng hẳn, không rơi sang fallback.
+    if [[ ! "$KC_TOK" =~ ^sk-ant-oat01-[A-Za-z0-9_-]{80,}$ ]]; then
+      echo "Token trong Keychain claude-collab-oauth sai dạng (len=${#KC_TOK}, cần sk-ant-oat01-…, ~108 ký tự); dừng." >&2
+      echo "Sửa: ~/.local/bin/claude setup-token, rồi lưu lại bằng lệnh read -rs + security add-generic-password -U (kb/lessons/2026-11-17-collab-bot-keychain-token.md)." >&2
+      unset KC_TOK
+      exit 1
+    fi
     export CLAUDE_CODE_OAUTH_TOKEN="$KC_TOK"
   fi
   unset KC_TOK
