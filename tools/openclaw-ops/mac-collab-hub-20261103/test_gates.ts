@@ -290,11 +290,18 @@ test("Claude Collab Settings: collab-settings.json enforces required permissions
     "Read(**/.env.*)",
     "Read(~/.claude/channels/**)",
     "Read(~/.codex/**)",
-    "Bash(ssh:*)",
-    "Bash(scp:*)",
-    "Bash(git push:*)",
   ]) {
     assert.ok(deny.includes(requiredRule), `Missing required deny rule: ${requiredRule}`);
+  }
+  // 2026-11-07 autonomy change: ssh/scp/git push moved from deny to ask (space form), so accept either.
+  const ask: string[] = settings.permissions?.ask ?? [];
+  for (const cmd of ["ssh", "scp", "git push"]) {
+    const colonForm = `Bash(${cmd}:*)`;
+    const spaceForm = `Bash(${cmd} *)`;
+    assert.ok(
+      deny.includes(colonForm) || deny.includes(spaceForm) || ask.includes(spaceForm),
+      `"${cmd}" must be gated: need ${colonForm} in deny, or ${spaceForm} in deny or ask`,
+    );
   }
 });
 
