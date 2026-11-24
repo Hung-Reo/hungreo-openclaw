@@ -27,6 +27,7 @@ Nguyên tắc: **Aligned · Simple · Safe · Effective** + **Grill & Align → 
 3. `LOCAL_CONTEXT.md` — Topology, ports, paths, SSH.
 4. `kb/lessons-learned.index.md` → `kb/lessons/2026-10-*.md` — Incidents đã trả giá (grep pattern liên quan task).
 5. `tools/openclaw-ops/lcm-111-20261015/README.md` (`00_precheck.sh`, `10_upgrade.sh`, `20_verify.sh`, `99_rollback.sh`) — Khuôn mẫu chuẩn cho mọi script nâng cấp core/plugin. Bản mới nhất theo khuôn này: `node-24221-rehearsal-934-20261026/` (Node + core 9.34) và `lcm-120-20261025/` (LCM 1.2.0 + `30_soak.sh`).
+6. **Nâng lên 11.x (từ 24/11/2026):** `kb/openclaw-117-upgrade-runbook.md` + `kb/lessons/2026-11-24-openclaw-117-cutover.md`. Bẫy chính: CLI admin chỉ chạy offline, Doctor tự restart gateway, plugin TS 15s, model catalog theo phiên bản Codex. Script: `tools/openclaw-ops/hungreo-117-sol62-20261123/`.
 
 **Research read-only TRƯỚC → present plan (tối đa 3 phương án, 1 Recommended) → CHỜ Hưng GO rõ → mới action.**
 
