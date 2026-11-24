@@ -34,5 +34,5 @@ Runbook dùng lại: `kb/openclaw-117-upgrade-runbook.md`. Bằng chứng: `tool
 ## Còn mở
 
 - Watcher hot-reload config lỗi "watch observation worker stopped" 3/3 lần sau mỗi lần start.
-- Đổi Rùa sang Sol 6.2: cache Codex 0.170 đã có `gpt-6.2-sol` (17:46 ngày 24/11). Chờ GO.
+- Đổi Rùa sang Sol 6.2 lúc 18:34 thất bại và đã tự trả về 6.1: manifest plugin openai của 11.7 chưa có `gpt-6.2-sol`, nên route API key bị 401 rồi rơi sang fallback OpenRouter. Bài học: `config set`/`validate` PASS không chứng minh model chạy được; luôn kiểm bằng một lượt thật và check `fallbackUsed`.
 - Suckhoe vẫn ở 9.36. Khi nâng, theo runbook, kiểm plugin TS local và heartbeat của profile đó.

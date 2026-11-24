@@ -72,6 +72,8 @@ Danh sách model trong `codex-home/models_cache.json` do server trả về **the
 
 Lúc cutover, cache vẫn là bản do 0.160 ghi, nên `config set` báo "Unknown model". Cách làm: nâng runtime với model cũ trước, đợi gateway 11.7 làm mới cache, kiểm lại danh sách, rồi đổi model ở một bước riêng có GO.
 
+**Cập nhật 24/11 18:36 (VERIFIED):** cache có `gpt-6.2-sol` vẫn **chưa đủ**. Plugin `openai` của 11.7 chỉ biết các model Codex tới `gpt-6.1-sol` (`dist/extensions/openai/.setup/openclaw.plugin-*.mjs`, `resolveCodexForwardCompatModel`). Vì vậy `openai/gpt-6.2-sol` đi route API key (`openai-responses`), bị 401, rồi rơi sang fallback OpenRouter. `config set` và `validate` vẫn báo thành công, chỉ lượt thật mới lộ ra. Kiểm trước khi đổi: `grep -o "gpt-6[.0-9]*-[a-z]*" dist/extensions/openai/.setup/openclaw.plugin-*.mjs`. Cần bản OpenClaw có model đó trong manifest (2026.11.8 ra 24/11, chưa kiểm).
+
 ## 6. Hậu kiểm 3 tầng
 
 1. Config/job: `compare.py compare` PASS; số job đúng; heartbeat có lượt kế tiếp; `nano-banana-pro` không còn.
