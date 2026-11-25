@@ -1,0 +1,5 @@
+[Unit]
+Description=Kiểm hạn đăng nhập claude.ai của bot Claude, nhắc Hưng khi còn ≤ 5 ngày
+[Service]
+Type=oneshot
+ExecStart=/home/claudebot/collab-hub/login-check.sh

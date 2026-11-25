@@ -43,8 +43,13 @@ Gỡ hẳn: `sudo bash ~/claude-bot-vps-20261125/99_b1_rollback_root.sh`.
 - CI của fork không chạy (runner `blacksmith-*` của upstream) → quét secret thủ công trước khi merge.
 - Hưng giữ connector claude.ai cho bot VPS (không chặn).
 
+## C1/C2 git chung + nhắc login (25/11 18:00)
+- Repo private `Hung-Reo/collab-bot`. User `collabsync` giữ deploy key read-write. Git dir `/home/collabsync/collab-bot.git` nằm NGOÀI thư mục bot, worktree `~claudebot/collab-bot` (ACL cho collabsync). Timer hệ thống `collab-sync.timer` 2 phút chạy `/usr/local/lib/collab-sync/sync.sh` (`core.hooksPath=/dev/null`). Setup: `30_c1_root.sh`, rollback `99_c1_rollback_root.sh`.
+- Bẫy: `.gitignore` chỉ có ở 1 bên thì lượt sync đầu commit việc xoá nó. Phải đồng bộ `.gitignore` trước khi bật timer.
+- `handoff/README.md`: TASK (bot ghi) / RESULT (app PC ghi), TASK không phải GO.
+- `claude-login-check.timer` (user claudebot, 08:30 VNT) đọc `loginExpiresAt` trong `claude auth status --json`, còn ≤ 5 ngày thì DM Hưng qua bot.
+
 ## Còn mở
-- Login hết khoảng 24/12/2026 → `sudo -iu claudebot` + `claude auth login`.
-- Token setup-token thừa ở `~claudebot/.config/claude-collab/oauth`: thu hồi trên claude.ai rồi xoá file.
-- Voice trên VPS (B6), git chung `collab-bot` + hộp thư `handoff/` (C1/C2) chưa làm.
+- Login hết khoảng 24/12/2026 → `sudo -iu claudebot` + `claude auth login` (timer tự nhắc trước 5 ngày).
+- Token setup-token thừa: file đã xoá 25/11; chưa rõ chỗ thu hồi phía claude.ai.
 - Bản vá plugin sẽ mất khi plugin tự cập nhật.
