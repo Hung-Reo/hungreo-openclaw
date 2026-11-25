@@ -46,11 +46,40 @@ export const SLASH_PROMPTS = {
 } as const
 export type SlashPromptName = keyof typeof SLASH_PROMPTS
 
+// Nút mở phiên mới sau /handover.
+export const NEW_SESSION_CALLBACK = 'session:new'
+export const NEW_SESSION_BUTTON = '🔄 Mở phiên mới'
+export const NEW_SESSION_HINT =
+  '📝 Claude đang ghi handover. Khi Claude báo xong, bấm nút dưới để mở phiên mới sạch ' +
+  '(phiên mới sẽ đọc handover này trước). Phiên cũ vẫn lưu trên VPS.'
+export const HANDOVER_MAX_AGE_MS = 30 * 60_000
+
+/** mtime mới nhất của handover-*.md, hoặc null. */
+export function latestHandoverMs(dir: string): number | null {
+  let best: number | null = null
+  try {
+    for (const name of readdirSync(dir)) {
+      if (!/^handover-.*\.md$/.test(name)) continue
+      const m = statSync(join(dir, name)).mtimeMs
+      if (best == null || m > best) best = m
+    }
+  } catch {}
+  return best
+}
+
+/** sinceMs = lúc bấm /handover: chỉ chấp nhận handover ghi SAU mốc đó, và không quá 30 phút. */
+export function newSessionVerdict(handoverMs: number | null, sinceMs: number, now: number): { ok: boolean; text: string } {
+  if (handoverMs == null || handoverMs < sinceMs || now - handoverMs > HANDOVER_MAX_AGE_MS) {
+    return { ok: false, text: 'Chưa thấy file handover mới từ lúc bấm /handover. Đợi Claude báo xong rồi bấm lại nhé.' }
+  }
+  return { ok: true, text: '🔄 Đang mở phiên mới, khoảng 30 giây. Nhắn bot 1 câu là phiên mới đọc handover và tiếp tục.' }
+}
+
 export const HELP_TEXT =
   '🤖 Claude chạy 24/7 trên VPS, dùng gói claude.ai (không tính tiền API).\n\n' +
   'Cứ nhắn tin, gửi ảnh hay voice (khi voice đang bật). Việc cần quyền, bot sẽ hỏi qua nút bấm ở DM.\n\n' +
   '/status — tình trạng bot (không tốn lượt Claude)\n' +
-  '/handover — nhờ Claude ghi handover phiên\n' +
+  '/handover — nhờ Claude ghi handover, rồi có nút mở phiên mới\n' +
   '/tasks — nhờ Claude liệt kê việc đang mở\n' +
   '/help — tin này'
 

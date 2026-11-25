@@ -10,6 +10,9 @@ import {
   latestTranscript,
   parseAuthStatus,
   parseTranscript,
+  latestHandoverMs,
+  newSessionVerdict,
+  NEW_SESSION_CALLBACK,
   contextWindow,
   projectSlug,
   registerClaudeBotCommands,
@@ -191,6 +194,37 @@ describe('buildStatusText', () => {
     const t = buildStatusText({ ...base, auth: null, transcript: null, voiceOn: false })
     expect(t).toContain('không đọc được trạng thái')
     expect(t).toContain('Voice: TẮT')
+  })
+})
+
+describe('nút Mở phiên mới', () => {
+  const now = Date.parse('2026-11-25T12:30:00Z')
+  const since = now - 60_000
+  it('chỉ cho mở khi có handover ghi sau lúc bấm /handover và trong 30 phút', () => {
+    expect(newSessionVerdict(null, since, now).ok).toBe(false)
+    expect(newSessionVerdict(since - 1, since, now).ok).toBe(false)
+    expect(newSessionVerdict(since + 10_000, since, now).ok).toBe(true)
+    expect(newSessionVerdict(since + 10_000, since, since + 10_000 + 31 * 60_000).ok).toBe(false)
+  })
+  it('latestHandoverMs chỉ xét handover-*.md', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ho-'))
+    writeFileSync(join(dir, 'README.md'), 'x')
+    expect(latestHandoverMs(dir)).toBeNull()
+    writeFileSync(join(dir, 'handover-20261125-1907.md'), 'x')
+    expect(latestHandoverMs(dir)).not.toBeNull()
+    expect(latestHandoverMs('/nonexistent-xyz')).toBeNull()
+  })
+  it('server.ts: handler nút đăng ký TRƯỚC handler perm chung, chặn người lạ, restart tách qua systemd-run', () => {
+    const src = readFileSync(join(PLUGIN, 'server.ts'), 'utf8')
+    const btn = src.indexOf('bot.callbackQuery(NEW_SESSION_CALLBACK')
+    const perm = src.indexOf("bot.on('callback_query:data'")
+    expect(btn).toBeGreaterThan(0)
+    expect(btn).toBeLessThan(perm)
+    const body = src.slice(btn, perm)
+    expect(body).toContain("ctx.chat?.type !== 'private'")
+    expect(body).toContain('access.allowFrom.includes(senderId)')
+    expect(body).toContain("'systemd-run', ['--user'")
+    expect(NEW_SESSION_CALLBACK).toMatch(/^[a-z:]{1,64}$/)
   })
 })
 

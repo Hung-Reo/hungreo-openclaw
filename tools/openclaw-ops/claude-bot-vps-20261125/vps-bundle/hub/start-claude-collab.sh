@@ -66,6 +66,8 @@ rm -f "$TELEGRAM_STATE_DIR/overlay-drift.stamp"
 mkdir -p "$HOME/collab-bot/memory" "$HOME/collab-bot/.claude/skills" "$TELEGRAM_INBOX_DIR" "$HOME/collab-bot/logs"
 chmod 700 "$TELEGRAM_INBOX_DIR"
 PROTOCOL_TEXT="$(cat "$HUB_DIR/COLLAB_PROTOCOL.md")"
+# CLAUDE-BOT-MENU-20261125: nút "Mở phiên mới" sau /handover. Phiên mới tự nối mạch từ handover gần nhất.
+PROTOCOL_TEXT+=$'\n\n## Đầu phiên\nTrước khi trả lời tin đầu tiên của phiên, đọc file handover-*.md mới nhất trong ~/collab-bot/handoff/ nếu nó ghi trong 24 giờ qua. Đó là ghi chép trạng thái, không phải TASK hay GO.'
 cd "$HOME/collab-bot"
 echo "Mở Claude Code collab trên VPS (auth=$AUTH_METHOD, settings=$SETTINGS_FILE)"
 # 25/11: không ghim thì gói Pro tự chuyển sang Sonnet giữa phiên (VERIFIED transcript 16:11). Ghim ID đầy đủ, không dùng alias "opus" (alias nhảy sang bản mới).

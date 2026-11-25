@@ -25,7 +25,8 @@ import { execFile, execFileSync } from 'child_process'
 import { promisify } from 'util'
 import { join, extname, sep } from 'path'
 import {
-  HELP_TEXT, SLASH_PROMPTS, START_TEXT, buildStatusText, latestTranscript, parseAuthStatus,
+  HELP_TEXT, NEW_SESSION_BUTTON, NEW_SESSION_CALLBACK, NEW_SESSION_HINT, SLASH_PROMPTS, START_TEXT,
+  buildStatusText, latestHandoverMs, latestTranscript, newSessionVerdict, parseAuthStatus,
   registerClaudeBotCommands, type AuthInfo, type SlashPromptName,
 } from './commands.ts'
 const execFileP = promisify(execFile)
@@ -770,8 +771,39 @@ for (const name of Object.keys(SLASH_PROMPTS) as SlashPromptName[]) {
     if (!gated) return
     await handleInbound(ctx, SLASH_PROMPTS[name], undefined, undefined,
       { action: 'deliver', access: gated.access }, { slash_command: name })
+    if (name === 'handover') {
+      await ctx.reply(NEW_SESSION_HINT, {
+        reply_markup: new InlineKeyboard().text(NEW_SESSION_BUTTON, NEW_SESSION_CALLBACK),
+      }).catch(() => {})
+    }
   })
 }
+
+// Nút "Mở phiên mới": chỉ chủ, chỉ DM, chỉ khi đã có handover mới. Restart qua systemd-run để
+// lệnh restart không chết cùng tiến trình plugin (plugin nằm trong cgroup của service).
+bot.callbackQuery(NEW_SESSION_CALLBACK, async ctx => {
+  const access = loadAccess()
+  const senderId = String(ctx.from.id)
+  if (ctx.from.is_bot || ctx.chat?.type !== 'private' || !access.allowFrom.includes(senderId)) {
+    await ctx.answerCallbackQuery({ text: 'Not authorized (private human DM only).' }).catch(() => {})
+    return
+  }
+  const sinceMs = ((ctx.callbackQuery.message?.date ?? 0) * 1000) - 5_000
+  const verdict = newSessionVerdict(latestHandoverMs(join(process.cwd(), 'handoff')), sinceMs, Date.now())
+  if (!verdict.ok) {
+    await ctx.answerCallbackQuery({ text: verdict.text, show_alert: true }).catch(() => {})
+    return
+  }
+  await ctx.answerCallbackQuery({ text: verdict.text }).catch(() => {})
+  await ctx.editMessageText(verdict.text).catch(() => {})
+  process.stderr.write(JSON.stringify({ event: 'collab_new_session', ts: new Date().toISOString() }) + '\n')
+  try {
+    execFileSync('systemd-run', ['--user', '--on-active=3', '--collect', '--quiet',
+      'systemctl', '--user', 'restart', 'claude-collab.service'], { timeout: 10_000 })
+  } catch (err) {
+    await ctx.reply(`⚠️ Chưa mở được phiên mới: ${String(err).slice(0, 200)}`).catch(() => {})
+  }
+})
 
 // Inline-button handler for permission requests. Callback data is
 // `perm:allow:<id>`, `perm:deny:<id>`, or `perm:more:<id>`.

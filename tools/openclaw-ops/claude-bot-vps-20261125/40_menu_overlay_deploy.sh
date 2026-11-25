@@ -13,7 +13,7 @@ SCP=(scp -q -o ConnectTimeout=10 -i "$HOME/.ssh/hostinger_kvm2")
 DEST=claudebot@72.61.123.33
 
 # Các bản đã từng chạy (đo 25/11). Lần 1 (18:45): launcher ebb4649b…/server 45d2aff7…; lần 2: aafc32a2…/a35fb740…
-EXPECT_LAUNCHER="ebb4649b448e3608a2efa929294b7ae8fe2edc77616afcecc64ad77fdedde9cf,aafc32a26320f34026ea00e08bc622dbb336ec56a8ff386cd4f81cbcb2fa19a7"
+EXPECT_LAUNCHER="ebb4649b448e3608a2efa929294b7ae8fe2edc77616afcecc64ad77fdedde9cf,aafc32a26320f34026ea00e08bc622dbb336ec56a8ff386cd4f81cbcb2fa19a7,5097c367b76173e035c25094a6a659cc688684eba8f8be700f1999ec924e9092"
 EXPECT_SERVER="45d2aff7ac797f280cfc2e46788af6983e07cf9c0d98c10b467385f29156fad4,a35fb740b0f2da24dc36c19f0ea5b7b1e2cc0079252093162803f9ccfccb9f32"
 NEW_SERVER="$(shasum -a 256 "$B/plugin/server.ts" | cut -d' ' -f1)"
 
