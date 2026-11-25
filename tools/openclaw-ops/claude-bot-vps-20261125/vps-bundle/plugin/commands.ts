@@ -63,7 +63,46 @@ export function projectSlug(cwd: string): string {
   return cwd.replace(/[^a-zA-Z0-9]/g, '-')
 }
 
-export type TranscriptInfo = { file: string; bytes: number; records: number; mtimeMs: number }
+export type TranscriptInfo = {
+  file: string
+  bytes: number
+  mtimeMs: number
+  turns: number
+  model?: string
+  contextTokens?: number
+  cumulativeTokens: number
+  lastTurnMs?: number
+  firstMs?: number
+}
+
+type Usage = { input_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; output_tokens?: number }
+const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+
+/** Chỉ đọc metadata (type, model, usage, timestamp); không đọc nội dung tin nhắn. */
+export function parseTranscript(raw: string): Omit<TranscriptInfo, 'file' | 'bytes' | 'mtimeMs'> {
+  let turns = 0, cumulative = 0, model: string | undefined, ctx: number | undefined, last: number | undefined, first: number | undefined
+  const seen = new Set<string>()
+  for (const line of raw.split('\n')) {
+    if (!line) continue
+    let r: { type?: string; subtype?: string; isSidechain?: boolean; timestamp?: string; message?: { id?: string; model?: string; usage?: Usage } }
+    try { r = JSON.parse(line) } catch { continue }
+    const ts = r.timestamp ? Date.parse(r.timestamp) : NaN
+    if (first == null && !Number.isNaN(ts)) first = ts
+    if (r.type === 'system' && r.subtype === 'turn_duration') { turns++; continue }
+    if (r.type !== 'assistant' || r.isSidechain) continue
+    const u = r.message?.usage
+    // Một câu trả lời được ghi thành nhiều bản ghi cùng message.id (mỗi khối nội dung một dòng): chỉ đếm 1 lần.
+    const id = r.message?.id
+    if (u && !(id && seen.has(id))) {
+      if (id) seen.add(id)
+      cumulative += n(u.input_tokens) + n(u.cache_creation_input_tokens) + n(u.output_tokens)
+    }
+    if (u) ctx = n(u.input_tokens) + n(u.cache_read_input_tokens) + n(u.cache_creation_input_tokens)
+    if (r.message?.model) model = r.message.model
+    if (!Number.isNaN(ts)) last = ts
+  }
+  return { turns, cumulativeTokens: cumulative, ...(model ? { model } : {}), ...(ctx != null ? { contextTokens: ctx } : {}), ...(last != null ? { lastTurnMs: last } : {}), ...(first != null ? { firstMs: first } : {}) }
+}
 
 export function latestTranscript(projectsDir: string, cwd: string): TranscriptInfo | null {
   const dir = join(projectsDir, projectSlug(cwd))
@@ -78,12 +117,9 @@ export function latestTranscript(projectsDir: string, cwd: string): TranscriptIn
     return null
   }
   if (!best) return null
-  let records = 0
-  try {
-    const raw = readFileSync(join(dir, best.file), 'utf8')
-    for (let i = 0; i < raw.length; i++) if (raw.charCodeAt(i) === 10) records++
-  } catch {}
-  return { ...best, records }
+  let parsed: ReturnType<typeof parseTranscript> = { turns: 0, cumulativeTokens: 0 }
+  try { parsed = parseTranscript(readFileSync(join(dir, best.file), 'utf8')) } catch {}
+  return { ...best, ...parsed }
 }
 
 export type AuthInfo = { method: string; expiresAt?: string } | null
@@ -110,45 +146,72 @@ export type StatusInput = {
 
 const VN_TZ = 'Asia/Ho_Chi_Minh'
 function vnTime(ms: number): string {
-  return new Intl.DateTimeFormat('vi-VN', {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
     timeZone: VN_TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(new Date(ms))
+  }).formatToParts(new Date(ms)).map(x => [x.type, x.value]))
+  return `${p.hour}:${p.minute} ${p.day}/${p.month}`
 }
 function duration(sec: number): string {
   const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60)
   return d > 0 ? `${d} ngày ${h} giờ` : h > 0 ? `${h} giờ ${m} phút` : `${m} phút`
 }
 
-// Mốc cảnh báo phiên dài: số liệu đo 25/11 cho thấy mỗi phiên ~0.7–0.9 MB sau vài giờ.
-export const TRANSCRIPT_WARN_BYTES = 5 * 1024 * 1024
+// ASSUMPTION: cửa sổ 200k cho model không có hậu tố [1m]; mốc auto-compact chính xác không công bố → ghi "ước tính".
+export function contextWindow(model?: string): number {
+  return model && /\[1m\]/i.test(model) ? 1_000_000 : 200_000
+}
 export const LOGIN_WARN_DAYS = 5
+export const EXPECTED_MODEL_PREFIX = 'claude-opus-'
+
+function bar(pct: number): string {
+  const full = Math.max(0, Math.min(10, Math.round(pct / 10)))
+  return (pct >= 80 ? '🟥' : pct >= 60 ? '🟧' : '🟨').repeat(full) + '⬜'.repeat(10 - full)
+}
+const fmt = (v: number) => v.toLocaleString('en-US')
+function ago(ms: number): string {
+  const sec = Math.max(0, Math.floor(ms / 1000))
+  return sec < 60 ? 'vừa xong' : `${duration(sec)} trước`
+}
 
 export function buildStatusText(s: StatusInput): string {
-  const lines = [`🟢 Bot đang chạy, ghép đôi với ${s.pairedAs}.`]
-  lines.push(`⏱️ Phiên này mở được ${duration(s.pluginUptimeSec)} (từ ${vnTime(s.now - s.pluginUptimeSec * 1000)}).`)
-  if (s.transcript) {
-    const kb = Math.round(s.transcript.bytes / 1024)
-    const warn = s.transcript.bytes >= TRANSCRIPT_WARN_BYTES ? ' ⚠️ phiên đã dài, nên /handover rồi mở phiên mới' : ''
-    lines.push(`📜 Transcript: ${kb} KB, ${s.transcript.records} bản ghi, sửa lúc ${vnTime(s.transcript.mtimeMs)}.${warn}`)
+  const startMs = s.now - s.pluginUptimeSec * 1000
+  const lines = [`📊 Trạng thái @hungreo_claude_bot (ghép đôi ${s.pairedAs})`]
+  // Launcher không --resume: phiên hiện tại luôn bắt đầu sau khi bot mở. File cũ hơn = phiên trước restart.
+  const t = s.transcript && (s.transcript.firstMs ?? 0) >= startMs - 120_000 ? s.transcript : null
+  if (t?.model) {
+    const off = t.model.startsWith(EXPECTED_MODEL_PREFIX) ? '' : ' ⚠️ không phải Opus'
+    lines.push(`- Model: ${t.model}${off}`)
   } else {
-    lines.push('📜 Transcript: chưa thấy file.')
+    lines.push('- Model: chưa có lượt trả lời trong phiên này')
   }
-  lines.push(`🎙️ Voice: ${s.voiceOn ? 'BẬT' : 'TẮT'}.`)
-  if (!s.auth) {
-    lines.push('🔑 Đăng nhập: không đọc được trạng thái.')
-  } else if (s.auth.method !== 'claude.ai') {
-    lines.push(`🔑 Đăng nhập: ⚠️ authMethod=${s.auth.method}, không phải claude.ai.`)
-  } else if (s.auth.expiresAt) {
-    const exp = Date.parse(s.auth.expiresAt)
-    if (Number.isNaN(exp)) {
-      lines.push('🔑 Đăng nhập claude.ai: không rõ hạn.')
-    } else {
-      const days = Math.floor((exp - s.now) / 86400000)
-      const warn = days <= LOGIN_WARN_DAYS ? ' ⚠️ sắp hết, cần claude auth login lại' : ''
-      lines.push(`🔑 Đăng nhập claude.ai: còn ${days} ngày (hết ${vnTime(exp)}).${warn}`)
+  lines.push(`- Bot mở lúc: ${vnTime(startMs)} (VNT) · chạy ${duration(s.pluginUptimeSec)}`)
+  if (!t) {
+    lines.push('- Phiên: mới, chưa có lượt nào')
+  } else {
+    const lastTxt = t.lastTurnMs != null ? ` · lượt cuối ${ago(s.now - t.lastTurnMs)}` : ''
+    lines.push(`- Phiên: ${t.file.slice(0, 8)}… · ${t.turns} lượt${lastTxt}`)
+    if (t.contextTokens != null) {
+      const win = contextWindow(t.model)
+      const pct = (t.contextTokens / win) * 100
+      const tag = pct >= 80 ? '🔴 nên /handover' : pct >= 60 ? '🟠 sắp đầy' : '🟢 dư dả'
+      lines.push(`- Context (ước tính): ${fmt(t.contextTokens)} / ${fmt(win)} tokens (${pct.toFixed(0)}%) · ${tag}`)
+      lines.push(`  ${bar(pct)}`)
     }
-  } else {
-    lines.push('🔑 Đăng nhập claude.ai: không rõ hạn.')
+    lines.push(`- Cộng dồn: ${fmt(t.cumulativeTokens)} tokens (input mới + output, không tính cache đọc lại)`)
   }
+  let login: string
+  if (!s.auth) login = 'không đọc được trạng thái'
+  else if (s.auth.method !== 'claude.ai') login = `⚠️ authMethod=${s.auth.method}, không phải claude.ai`
+  else {
+    const exp = s.auth.expiresAt ? Date.parse(s.auth.expiresAt) : NaN
+    if (Number.isNaN(exp)) login = 'claude.ai, không rõ hạn'
+    else {
+      const days = Math.floor((exp - s.now) / 86400000)
+      login = `claude.ai còn ${days} ngày (hết ${vnTime(exp)})${days <= LOGIN_WARN_DAYS ? ' ⚠️ sắp hết' : ''}`
+    }
+  }
+  lines.push(`- Voice: ${s.voiceOn ? 'BẬT' : 'TẮT'} · Login: ${login}`)
+  lines.push('')
+  lines.push('Lệnh nhanh: /handover ghi handover · /tasks việc đang mở')
   return lines.join('\n')
 }

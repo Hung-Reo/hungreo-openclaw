@@ -9,6 +9,8 @@ import {
   buildStatusText,
   latestTranscript,
   parseAuthStatus,
+  parseTranscript,
+  contextWindow,
   projectSlug,
   registerClaudeBotCommands,
   type StatusInput,
@@ -81,18 +83,18 @@ describe('projectSlug + latestTranscript', () => {
     expect(projectSlug('/home/claudebot/collab-bot')).toBe('-home-claudebot-collab-bot')
   })
 
-  it('chọn file .jsonl mới nhất và đếm bản ghi', () => {
+  it('chọn file .jsonl mới nhất', () => {
     const root = mkdtempSync(join(tmpdir(), 'cb-'))
     const dir = join(root, projectSlug('/w/collab-bot'))
     mkdirSync(dir)
-    writeFileSync(join(dir, 'old.jsonl'), 'a\nb\n')
-    writeFileSync(join(dir, 'new.jsonl'), 'x\ny\nz\n')
+    const turn = JSON.stringify({ type: 'system', subtype: 'turn_duration' })
+    writeFileSync(join(dir, 'old.jsonl'), turn + '\n')
+    writeFileSync(join(dir, 'new.jsonl'), [turn, turn, 'không phải json'].join('\n'))
     writeFileSync(join(dir, 'note.txt'), 'ignore')
     utimesSync(join(dir, 'old.jsonl'), new Date(1000), new Date(1000))
     const t = latestTranscript(root, '/w/collab-bot')
     expect(t?.file).toBe('new.jsonl')
-    expect(t?.records).toBe(3)
-    expect(t?.bytes).toBe(6)
+    expect(t?.turns).toBe(2)
   })
 
   it('thiếu thư mục thì trả null, không ném lỗi', () => {
@@ -111,43 +113,83 @@ describe('parseAuthStatus', () => {
   })
 })
 
+describe('parseTranscript (metadata thật từ VPS, không có nội dung)', () => {
+  const raw = readFileSync(join(import.meta.dir, 'fixtures', 'transcript-meta.jsonl'), 'utf8')
+  it('khớp số tính bằng jq trên cùng file', () => {
+    const p = parseTranscript(raw)
+    expect(p.turns).toBe(11)
+    expect(p.cumulativeTokens).toBe(141237)
+    expect(p.contextTokens).toBe(80927)
+    expect(p.model).toBe('claude-sonnet-5-5')
+    expect(p.lastTurnMs).toBe(Date.parse('2026-11-25T09:11:28.670Z'))
+    expect(p.firstMs).toBe(Date.parse('2026-11-25T08:17:55.723Z'))
+  })
+  it('đếm usage 1 lần cho mỗi message.id, bỏ sidechain', () => {
+    const u = { input_tokens: 10, cache_read_input_tokens: 100, cache_creation_input_tokens: 5, output_tokens: 20 }
+    const rec = (o: object) => JSON.stringify({ type: 'assistant', timestamp: '2026-11-25T00:00:00Z', ...o })
+    const p = parseTranscript([
+      rec({ message: { id: 'a', model: 'claude-opus-5-5', usage: u } }),
+      rec({ message: { id: 'a', model: 'claude-opus-5-5', usage: u } }),
+      rec({ isSidechain: true, message: { id: 'b', model: 'claude-haiku-5-5', usage: u } }),
+    ].join('\n'))
+    expect(p.cumulativeTokens).toBe(35)
+    expect(p.contextTokens).toBe(115)
+    expect(p.model).toBe('claude-opus-5-5')
+  })
+  it('cửa sổ context', () => {
+    expect(contextWindow('claude-opus-5-5')).toBe(200_000)
+    expect(contextWindow('claude-opus-5-5[1m]')).toBe(1_000_000)
+  })
+})
+
 describe('buildStatusText', () => {
   const now = Date.parse('2026-11-25T12:00:00Z')
+  const uptime = 3 * 3600 + 5 * 60
+  const start = now - uptime * 1000
+  const transcript = {
+    file: 'd35d7b02-8a5b.jsonl', bytes: 1, mtimeMs: now, turns: 6, model: 'claude-opus-5-5',
+    contextTokens: 77_500, cumulativeTokens: 12_400, lastTurnMs: now - 12 * 60_000, firstMs: start + 30_000,
+  }
   const base: StatusInput = {
-    now, pluginUptimeSec: 3 * 3600 + 5 * 60,
-    transcript: { file: 'a.jsonl', bytes: 744054, records: 167, mtimeMs: now },
-    voiceOn: true,
-    auth: { method: 'claude.ai', expiresAt: '2026-12-24T12:00:00Z' },
-    pairedAs: '@hung',
+    now, pluginUptimeSec: uptime, transcript, voiceOn: true,
+    auth: { method: 'claude.ai', expiresAt: '2026-12-24T12:00:00Z' }, pairedAs: '@hung',
   }
 
-  it('ca bình thường: đủ 5 dòng, không cảnh báo', () => {
+  it('ca bình thường: đủ thông tin như mẫu Gemini, không cảnh báo', () => {
     const t = buildStatusText(base)
-    expect(t.split('\n').length).toBe(5)
-    expect(t).toContain('@hung')
-    expect(t).toContain('3 giờ 5 phút')
-    expect(t).toContain('727 KB, 167 bản ghi')
+    expect(t).toContain('Model: claude-opus-5-5')
+    expect(t).toContain('chạy 3 giờ 5 phút')
+    expect(t).toContain('d35d7b02… · 6 lượt · lượt cuối 12 phút trước')
+    expect(t).toContain('77,500 / 200,000 tokens (39%)')
+    expect(t).toContain('🟨🟨🟨🟨⬜⬜⬜⬜⬜⬜')
+    expect(t).toContain('Cộng dồn: 12,400 tokens')
     expect(t).toContain('Voice: BẬT')
     expect(t).toContain('còn 29 ngày')
+    expect(t).toContain('Lệnh nhanh: /handover')
     expect(t).not.toContain('⚠️')
   })
 
-  it('cảnh báo khi transcript to và login sắp hết', () => {
-    const t = buildStatusText({ ...base, transcript: { ...base.transcript!, bytes: 6 * 1024 * 1024 },
+  it('cảnh báo model không phải Opus, context đầy, login sắp hết', () => {
+    const t = buildStatusText({ ...base,
+      transcript: { ...transcript, model: 'claude-sonnet-5-5', contextTokens: 170_000 },
       auth: { method: 'claude.ai', expiresAt: '2026-11-28T12:00:00Z' } })
-    expect(t).toContain('phiên đã dài')
+    expect(t).toContain('⚠️ không phải Opus')
+    expect(t).toContain('(85%)')
+    expect(t).toContain('nên /handover')
+    expect(t).toContain('🟥')
     expect(t).toContain('còn 3 ngày')
-    expect(t).toContain('sắp hết')
   })
 
-  it('authMethod không phải claude.ai thì báo rõ', () => {
+  it('transcript của phiên trước restart thì không lấy số', () => {
+    const t = buildStatusText({ ...base, transcript: { ...transcript, firstMs: start - 3600_000 } })
+    expect(t).toContain('Phiên: mới, chưa có lượt nào')
+    expect(t).not.toContain('d35d7b02')
+  })
+
+  it('authMethod lạ thì báo rõ; không đọc được thì vẫn trả lời', () => {
     expect(buildStatusText({ ...base, auth: { method: 'api_key' } })).toContain('authMethod=api_key')
-  })
-
-  it('không đọc được auth / transcript thì vẫn trả lời', () => {
     const t = buildStatusText({ ...base, auth: null, transcript: null, voiceOn: false })
     expect(t).toContain('không đọc được trạng thái')
-    expect(t).toContain('chưa thấy file')
     expect(t).toContain('Voice: TẮT')
   })
 })

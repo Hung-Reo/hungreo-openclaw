@@ -68,10 +68,13 @@ chmod 700 "$TELEGRAM_INBOX_DIR"
 PROTOCOL_TEXT="$(cat "$HUB_DIR/COLLAB_PROTOCOL.md")"
 cd "$HOME/collab-bot"
 echo "Mở Claude Code collab trên VPS (auth=$AUTH_METHOD, settings=$SETTINGS_FILE)"
+# 25/11: không ghim thì gói Pro tự chuyển sang Sonnet giữa phiên (VERIFIED transcript 16:11). Ghim ID đầy đủ, không dùng alias "opus" (alias nhảy sang bản mới).
 exec "$CLAUDE_BIN" \
   --setting-sources user \
   --settings "$SETTINGS_FILE" \
   --channels "plugin:telegram@claude-plugins-official" \
+  --model claude-opus-5-5 \
+  --effort medium \
   --permission-mode auto \
   --add-dir "$HOME/collab-bot" \
   --allowedTools "mcp__plugin_telegram_telegram__reply,mcp__plugin_telegram_telegram__react,mcp__plugin_telegram_telegram__edit_message,mcp__plugin_telegram_telegram__download_attachment" \
