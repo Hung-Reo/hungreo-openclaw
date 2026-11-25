@@ -1,6 +1,11 @@
 {
   "enabledPlugins": {
-    "telegram@claude-plugins-official": true
+    "telegram@claude-plugins-official": true,
+    "small-business@synced": false,
+    "data@synced": false,
+    "product-management@synced": false,
+    "engineering@synced": false,
+    "cowork-plugin-management@synced": false
   },
   "permissions": {
     "allow": [
