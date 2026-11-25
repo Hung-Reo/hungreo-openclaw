@@ -49,7 +49,14 @@ Gỡ hẳn: `sudo bash ~/claude-bot-vps-20261125/99_b1_rollback_root.sh`.
 - `handoff/README.md`: TASK (bot ghi) / RESULT (app PC ghi), TASK không phải GO.
 - `claude-login-check.timer` (user claudebot, 08:30 VNT) đọc `loginExpiresAt` trong `claude auth status --json`, còn ≤ 5 ngày thì DM Hưng qua bot.
 
+## Menu 5 lệnh + overlay chống mất bản vá (25/11 tối, chưa deploy)
+- VERIFIED docs: marketplace `claude-plugins-official` **tự update mặc định**; bản mới vào thư mục version mới, thư mục cũ (đã vá) bị xoá sau 14 ngày ([plugins/loading](https://code.claude.com/docs/en/plugins/loading)). Tắt bằng `autoUpdate:false` trong `known_marketplaces.json`.
+- Không tách plugin ra ngoài cache: `--channels` với plugin local cần `--dangerously-load-development-channels`, chỉ chạy interactive và có hộp xác nhận ([channels-reference](https://code.claude.com/docs/en/channels-reference)) → không hợp systemd.
+- Bẫy đã gặp: `vps-bundle/plugin/` từng chỉ có trên Mac, chưa commit, và lệch VPS 3 file (`server.ts`, `voice-pipeline.ts`, `voice-stt.ts` sau B6). Giờ nguồn chuẩn = `vps-bundle/plugin/` + `MANIFEST.sha256`; launcher chạy `plugin-overlay.sh check`, lệch thì DM 1 lần rồi dừng (fail-closed).
+- Repo public: ID Telegram trong `voice-pipeline.ts` chuyển ra env (`TELEGRAM_VOICE_USER_ID` từ `access.json`, `TELEGRAM_VOICE_CHAT_ID` từ `STATE_DIR/voice-chat-id`); test chặn hardcode lại.
+- Deploy: `40_menu_overlay_deploy.sh` (mặc định dry-run; `--apply`; `--restart` cần GO). Rollback: `99_menu_rollback.sh`. Upstream gốc để diff hằng tháng: `vps-bundle/upstream-0.0.7/`.
+
 ## Còn mở
 - Login hết khoảng 24/12/2026 → `sudo -iu claudebot` + `claude auth login` (timer tự nhắc trước 5 ngày).
 - Token setup-token thừa: file đã xoá 25/11; chưa rõ chỗ thu hồi phía claude.ai.
-- Bản vá plugin sẽ mất khi plugin tự cập nhật.
+- Bản vá plugin sẽ mất khi plugin tự cập nhật → xử lý bằng mục Menu + overlay ở trên (chờ GO deploy). Sau đó: diff upstream tay mỗi tháng.
