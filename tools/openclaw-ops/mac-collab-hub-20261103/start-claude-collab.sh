@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# 25/11/2026: bot thật đã chuyển lên VPS (user claudebot). Marker này chặn bật lại trên Mac để không có 2 poller.
+# Rollback: dừng claude-collab.service trên VPS trước, rồi rm ~/collab-bot/MOVED-TO-VPS.
+if [[ -e "$HOME/collab-bot/MOVED-TO-VPS" ]]; then
+  echo "Bot đã chuyển lên VPS (~/collab-bot/MOVED-TO-VPS). Không mở trên Mac." >&2
+  exit 1
+fi
+
 # Khởi chạy phiên Claude Code trên Mac nối vào Group Telegram (CLAUDE-BOT-CAPS-20261112).
 # - --setting-sources user (KHÔNG nạp .claude/settings.local.json của repo)
 # - --settings <hub>/collab-settings.json (telegram plugin, owner-gate hook, allow/ask/deny, sandbox)

@@ -6,6 +6,22 @@
 
 ---
 
+### [2026-11-25] Bot Claude Telegram lên VPS 24/7: setup-token không đủ cho Channels, phải claude.ai login
+
+**Loại:** claude-code | telegram | channels | vps | auth | sandbox | apparmor | cutover
+**Discovered by:** Claude Code (PC)
+**Affects:** @hungreo_claude_bot (giờ chạy trên VPS, user `claudebot`, `claude-collab.service`)
+
+**Rule:**
+
+> - `--channels` cần đăng nhập claude.ai (`claude auth login`), `setup-token` chỉ gọi model, nên phiên kẹt "waiting for your organization's policy". Login hết khoảng 1 tháng.
+> - Bot chạy user Linux riêng, không sudo hay docker. Ubuntu 24.04 cần profile AppArmor cho bwrap. systemd chạy qua `script -qfec`, không dùng `tmux -d`.
+> - Bot được xin mở quyền qua nút duyệt DM. Không bật `strictAllowlist` (Hưng: siết quá tay).
+
+Chi tiết: `kb/lessons/2026-11-25-claude-bot-vps-cutover.md`.
+
+---
+
 ### [2026-11-03] Agent nối vào chat Telegram kế thừa allowlist rộng của repo → cổng duyệt quyền qua DM vô tác dụng
 
 **Loại:** security | telegram | claude-code | codex | permissions | exfiltration
