@@ -1,0 +1,142 @@
+{
+  "scope": "read-only VPS resource audit; no service/config/model/auth/cron/send/cleanup changes",
+  "host": "srv1367812",
+  "git": {
+    "branch": "codex/sync-origin-main-20260222",
+    "head": "abcace43cdb7663f4483509ba7b64c7e0428a9c6"
+  },
+  "clean_sample": {
+    "start": "2026-10-18T07:58:12.171564+00:00",
+    "end": "2026-10-18T07:59:12.189956+00:00",
+    "seconds": 60.01839328699862,
+    "cpus": 2,
+    "groups": {
+      "Hungreo": {
+        "cpu_one_core_pct": 8.939091345456271,
+        "ram_avg": 2062218971.4285715,
+        "ram_last": 2077384704,
+        "ram_peak": 2077384704,
+        "anon_last": 1687719936,
+        "cache_last": 271908864,
+        "swap_last": 581431296,
+        "oom_since_group_created": 0
+      },
+      "Suckhoe": {
+        "cpu_one_core_pct": 2.3014961320186265,
+        "ram_avg": 1368201508.5714285,
+        "ram_last": 1367502848,
+        "ram_peak": 1370517504,
+        "anon_last": 1172029440,
+        "cache_last": 119324672,
+        "swap_last": 545869824,
+        "oom_since_group_created": 0
+      },
+      "Hermes": {
+        "cpu_one_core_pct": 0.9248414854188411,
+        "ram_avg": 299642294.85714287,
+        "ram_last": 299638784,
+        "ram_peak": 299827200,
+        "anon_last": 295694336,
+        "cache_last": 1572864,
+        "swap_last": 0,
+        "oom_since_group_created": 0
+      },
+      "VNStock": {
+        "cpu_one_core_pct": 0.01399071108059633,
+        "ram_avg": 7720960,
+        "ram_last": 7720960,
+        "ram_peak": 7720960,
+        "anon_last": 5689344,
+        "cache_last": 1839104,
+        "swap_last": 10391552,
+        "oom_since_group_created": 0
+      },
+      "Nemo": {
+        "cpu_one_core_pct": 2.497654332117434,
+        "ram_avg": 1137952475.4285715,
+        "ram_last": 1139208192,
+        "ram_peak": 1139470336,
+        "anon_last": 978194432,
+        "cache_last": 85397504,
+        "swap_last": 709627904,
+        "oom_since_group_created": 0
+      },
+      "n8n": {
+        "cpu_one_core_pct": 0.17412328833974042,
+        "ram_avg": 143799442.2857143,
+        "ram_last": 143708160,
+        "ram_peak": 144199680,
+        "anon_last": 106639360,
+        "cache_last": 18280448,
+        "swap_last": 240472064,
+        "oom_since_group_created": 0
+      },
+      "Caddy": {
+        "cpu_one_core_pct": 0.0021076872117368533,
+        "ram_avg": 19243008,
+        "ram_last": 19243008,
+        "ram_peak": 19243008,
+        "anon_last": 8871936,
+        "cache_last": 8757248,
+        "swap_last": 1953792,
+        "oom_since_group_created": 0
+      }
+    },
+    "host": {
+      "cpu_busy_pct": 8.310341944653457,
+      "iowait_pct": 0.4347462586740239,
+      "steal_pct": 0.2090126243625115,
+      "available_avg": 3197605010.285714,
+      "memory_last": {
+        "MemTotal": 8326623232,
+        "MemAvailable": 3190935552,
+        "SwapTotal": 2147479552,
+        "SwapFree": 614400
+      },
+      "pressure": "some avg10=0.00 avg60=0.30 avg300=0.40 total=25627846\nfull avg10=0.00 avg60=0.23 avg300=0.31 total=16402758"
+    }
+  },
+  "storage": {
+    "measurement_utc": "2026-10-18T07:55:16Z",
+    "units": "bytes; report disk GB=1e9, memory GiB=2^30",
+    "filesystem": {
+      "total": 102888095744,
+      "used": 79256383488,
+      "available": 23614935040,
+      "used_percent": 78
+    },
+    "readable_root_allocated": 68551127040,
+    "home_allocated": 57874219008,
+    "categories": {
+      "Hungreo": 5670682624,
+      "Suckhoe": 2448871424,
+      "Nemo_sandbox": 7253835776,
+      "Nemo_legacy": 979509248,
+      "Hermes": 6999265280,
+      "VNStock_project_and_work": 619421696,
+      "global_backups": 12492308480,
+      "shared_local": 9055440896,
+      "shared_cache": 5308575744,
+      "shared_voice": 976138240,
+      "shared_openclaw_runtime_generations": 2899722240,
+      "website": 1094504448,
+      "other_home": 2075942912,
+      "readable_outside_home": 10676908032,
+      "unreconciled_privileged_metadata_deleted_open": 10705256448
+    },
+    "docker": {
+      "LayersSize_reported": 4633363109,
+      "image_sizes": [332307314, 83188615, 1729552554],
+      "container_writable_bytes": {
+        "nemo_sandbox": 88666112,
+        "nemo_rehearsal": 79269888,
+        "nemo_10_2": 87216128,
+        "nemo_10_1": 62205952,
+        "nemo_9_8": 69795840,
+        "n8n": 2084945920,
+        "caddy": 16056320
+      },
+      "note": "Engine logical accounting; not an independent du measurement and not added to filesystem categories. Bind mounts already counted in host paths."
+    }
+  }
+}

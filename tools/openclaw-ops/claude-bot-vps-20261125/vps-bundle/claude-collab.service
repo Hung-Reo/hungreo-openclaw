@@ -1,0 +1,17 @@
+[Unit]
+Description=Claude Code Telegram collab bot (VPS, user claudebot)
+After=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+Environment=TERM=xterm-256color
+ExecStart=/usr/bin/script -qfec "/home/claudebot/collab-hub/start-claude-collab.sh" /dev/null
+Restart=on-failure
+RestartSec=10
+MemoryMax=1536M
+TimeoutStopSec=20
+
+[Install]
+WantedBy=default.target

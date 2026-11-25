@@ -1,0 +1,29 @@
+{
+ "samples": [
+  "Mình đã kiểm lại: Hermes đúng về phiên bản (2.1.319).\n\n**VERIFIED** (vừa đọc nguồn):\n- npm dist-tags: latest = 2.1.319, stable = 2.1.311.\n- Lệnh `claude --version` và `npm view @anthropic-ai/claude-code dist-tags`.\n\n## Đề xuất\n1. Lên *2.1.319*; xem [changelog](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md).\n2. snake_case_name giữ nguyên, a_b + c-d = e!",
+  "```bash\necho \"a\\b`c\"\n```\nSau block (ok).",
+  "| Việc | Trạng thái |\n|---|---|\n| Rules | **Chưa** sửa |\n| ATTT 3 | Đang xét |\n\nHết.",
+  "> Trích dẫn dòng 1.\n> Dòng 2 (có ngoặc).\n\n~~bỏ~~ ||ẩn|| {x} [y] #tag",
+  "# Tiêu đề **đậm**\n* a *nghiêng* b\n* mục khác\nLink (ngoặc) [t](https://x.io/a_(b)) và `a\\b`.",
+  "Giá 5*3=15, 2 * 4 và __x__ _y_ ** lẻ.",
+  "Hermes -> Claude: /collab@hungreo_claude_bot TASK=RUUME-BCT-20261104-01 — @hungreo_bds_bot."
+ ],
+ "mdv2": [
+  "Mình đã kiểm lại: Hermes đúng về phiên bản \\(2\\.1\\.319\\)\\.\n\n*VERIFIED* \\(vừa đọc nguồn\\):\n\\- npm dist\\-tags: latest \\= 2\\.1\\.319, stable \\= 2\\.1\\.311\\.\n\\- Lệnh `claude --version` và `npm view @anthropic-ai/claude-code dist-tags`\\.\n\n*Đề xuất*\n1\\. Lên _2\\.1\\.319_; xem [changelog](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md)\\.\n2\\. snake\\_case\\_name giữ nguyên, a\\_b \\+ c\\-d \\= e\\!",
+  "```bash\necho \"a\\\\b\\`c\"\n```\nSau block \\(ok\\)\\.",
+  "*Rules*\n• Trạng thái: *Chưa* sửa\n\n*ATTT 3*\n• Trạng thái: Đang xét\n\nHết\\.",
+  "> Trích dẫn dòng 1\\.\n> Dòng 2 \\(có ngoặc\\)\\.\n\n~bỏ~ ||ẩn|| \\{x\\} \\[y\\] \\#tag",
+  "*Tiêu đề đậm*\n_ a _nghiêng\\* b\n\\* mục khác\nLink \\(ngoặc\\) [t](https://x.io/a_\\(b\\)) và `a\\\\b`\\.",
+  "Giá 5_3\\=15, 2 _ 4 và \\_\\_x\\_\\_ \\_y\\_ \\*\\* lẻ\\.",
+  "Hermes \\-\\> Claude: /collab@hungreo\\_claude\\_bot TASK\\=RUUME\\-BCT\\-20261104\\-01 — @hungreo\\_bds\\_bot\\."
+ ],
+ "plain": [
+  "Mình đã kiểm lại: Hermes đúng về phiên bản (2.1.319).\n\nVERIFIED (vừa đọc nguồn):\n- npm dist-tags: latest = 2.1.319, stable = 2.1.311.\n- Lệnh `claude --version` và `npm view @anthropic-ai/claude-code dist-tags`.\n\nĐề xuất\n1. Lên 2.1.319; xem [changelog](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md).\n2. snake_case_name giữ nguyên, a_b + c-d = e!",
+  "```bash\necho \"a\\b`c\"\n```\nSau block (ok).",
+  "Rules\n• Trạng thái: Chưa sửa\n\nATTT 3\n• Trạng thái: Đang xét\n\nHết.",
+  "> Trích dẫn dòng 1.\n> Dòng 2 (có ngoặc).\n\nbỏ ẩn {x} [y] #tag",
+  "Tiêu đề đậm\n_ a nghiêng b\n mục khác\nLink (ngoặc) [t](https://x.io/a(b)) và `a\\b`.",
+  "Giá 5_3=15, 2 _ 4 và __x__ y ** lẻ.",
+  "Hermes -> Claude: /collab@hungreo_claude_bot TASK=RUUME-BCT-20261104-01 — @hungreo_bds_bot."
+ ]
+}

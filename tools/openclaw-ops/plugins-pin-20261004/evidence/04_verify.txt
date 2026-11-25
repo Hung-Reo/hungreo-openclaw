@@ -1,0 +1,28 @@
+Sun Oct  4 20:49:06 +07 2026
+== (a) gateway: versions + load errors since restart
+-- hungreo active=active since=2026-10-04 20:47:54 NRestarts=0
+Oct 04 20:48:46 srv1367812 node[1720145]: 2026-10-04T20:48:46.626+07:00 [gateway] http server listening (8 plugins: codex, hungreo-finance, lossless-claw, memory-core, openai, parallel, telegram, typesafe; 34.7s)
+   {'brave': ('2026.9.8', 'loaded'), 'codex': ('2026.9.8', 'loaded'), 'deepseek': ('2026.9.8', 'loaded'), 'lossless-claw': ('1.1.0', 'loaded'), 'parallel': ('2026.9.8', 'loaded'), 'typesafe': ('2026.9.8', 'loaded'), 'hungreo-finance': ('0.1.0', 'loaded')}
+-- suckhoe active=active since=2026-10-04 20:47:13 NRestarts=0
+Oct 04 20:47:45 srv1367812 node[1719910]: 2026-10-04T20:47:45.527+07:00 [gateway] http server listening (9 plugins: brave, codex, lossless-claw, memory-core, openai, suckhoe-family-memory, suckhoe-kb-weekly, suckhoe-technical-hand
+   {'brave': ('2026.9.8', 'loaded'), 'codex': ('2026.9.8', 'loaded'), 'deepseek': ('2026.9.8', 'loaded'), 'lossless-claw': ('1.1.0', 'loaded'), 'suckhoe-family-memory': ('0.1.0', 'loaded'), 'suckhoe-kb-weekly': ('0.1.0', 'loaded'), 'suckhoe-technical-handoff': ('0.1.0', 'loaded')}
+== (a2) config DIFF vs backup SAU restart (bắt auto-migration lúc start)
+hungreo changed keys: 0
+suckhoe changed keys: 0
+== (a3) unpinned finding còn không
+hungreo {'critical': 0, 'warn': 5, 'info': 2} Unpinned plugin index install records: / - codex (@openclaw/codex)
+suckhoe {'critical': 0, 'warn': 5, 'info': 1} Unpinned plugin index install records: / - codex (@openclaw/codex)
+== (a4) suckhoe auth + memory index
+- openai:<REDACTED_EMAIL> (<REDACTED_EMAIL>) [openai/oauth; expires 2026-10-05T01:44:26.473Z; cooldown:auth until 2026-10-04T08:39:15.183Z] — Re-authenticate with `openclaw --profile suckhoe models auth login --provider openai --profile-id 'openai:<REDACTED_EMAIL>'`.
+Indexed: 101/101 files · 307 chunks
+Dirty: no
+  memory · 101/101 files · 307 chunks · 4.0 MiB text + embeddings
+Vector store: indexed (unprobed)
+Vector dims: 1536
+== (a5) skill google-sheets đã ra khỏi workspace
+  gone (backup: /home/hung/backups/maint-20261004-plugins/skills/google-sheets)
+== (c) UAT_OK (winner phải openai/gpt-6-sol, attempts=1)
+hungreo winner= openai gpt-6-sol attempts= 1 text= UAT_OK
+suckhoe winner= openai gpt-6-sol attempts= 1 text= UAT_OK
+== 403 sau restart (suckhoe)
+0

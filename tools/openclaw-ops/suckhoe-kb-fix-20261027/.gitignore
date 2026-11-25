@@ -1,0 +1,5 @@
+# Bản sao candidate.js chứa Telegram user ID thật (trong PII denylist) — không commit lên repo public.
+# Hash vẫn nằm trong SHA256SUMS; bản đang chạy + backup ở VPS (~/backups/suckhoe-kb-fix-20261027-101911).
+base/candidate.js
+v2/candidate.js
+tests/sim/live-dist/src/candidate.js

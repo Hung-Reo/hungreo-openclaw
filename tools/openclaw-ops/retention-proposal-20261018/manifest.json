@@ -1,0 +1,476 @@
+{
+  "schema": 1,
+  "mode": "PROPOSAL_ONLY_NO_DELETE_AUTHORIZATION",
+  "observed_date": "2026-10-18",
+  "host": "srv1367812",
+  "git_head": "abcace43cdb7663f4483509ba7b64c7e0428a9c6",
+  "requested_policy": "One latest complete recovery set per bot; active serving runtime is not a backup; Nemo retains one coupled10.2 rollback set.",
+  "remote_changes": false,
+  "items": [
+    {
+      "id": "keep-hungreo",
+      "bot": "Hungreo",
+      "status": "KEEP",
+      "path": "/home/hung/backups/openclaw/hungreo/20261018-021528",
+      "allocated_bytes": 1430552576,
+      "reason": "Latest completed daily set; state+sqlite SHA256 PASS; today's restore-check PASS.",
+      "gates": ["fresh-latest-resolution-before-any-future-cleanup"]
+    },
+    {
+      "id": "keep-suckhoe",
+      "bot": "Suckhoe",
+      "status": "KEEP",
+      "path": "/home/hung/backups/openclaw/suckhoe/20261018-021528",
+      "allocated_bytes": 249188352,
+      "reason": "Latest completed daily set; state+sqlite SHA256 PASS; today's restore-check PASS.",
+      "gates": ["fresh-latest-resolution-before-any-future-cleanup"]
+    },
+    {
+      "id": "keep-nemo",
+      "bot": "Nemo",
+      "status": "KEEP",
+      "path": "/home/hung/backups/nemo-10.3-lcm-20261014-212310",
+      "allocated_bytes": 627466240,
+      "reason": "Current rollback pointer selects this complete pre10.3 config/workspace pair; SHA256 both PASS.",
+      "gates": ["retain-runtime10.2-and-rollback-container-and-scripts"]
+    },
+    {
+      "id": "keep-hermes",
+      "bot": "Hermes",
+      "status": "KEEP_CANDIDATE",
+      "path": "/home/hung/.hermes/backups/pre-update-2026-10-18-124844.zip",
+      "allocated_bytes": 241389568,
+      "reason": "Latest full-state zip; CRC PASS; 1480 members, 12 DB members; installed backup code uses SQLite backup API and excludes sidecars.",
+      "gates": ["isolated-restore-or-equivalent-integrity-check-not-performed"]
+    },
+    {
+      "id": "old-h-daily",
+      "bot": "Hungreo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/openclaw/hungreo/20261017-021548",
+      "allocated_bytes": 1292869632,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-s-daily",
+      "bot": "Suckhoe",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/openclaw/suckhoe/20261017-021548",
+      "allocated_bytes": 248918016,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-h-pre98",
+      "bot": "Hungreo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/hungreo-upgrade-pre-9.8-20261003-153601",
+      "allocated_bytes": 1507508224,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-h-pre99",
+      "bot": "Hungreo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/openclaw-hungreo-pre99-20261008",
+      "allocated_bytes": 1492889600,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-h-attempt",
+      "bot": "Hungreo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/openclaw-hungreo-pre99-20261008-attempt1",
+      "allocated_bytes": 176128,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-h-embeddings",
+      "bot": "Hungreo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/hungreo-embeddings-20261006",
+      "allocated_bytes": 409116672,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-h-lcm",
+      "bot": "Hungreo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/lcm-111-hungreo-20261015-182918",
+      "allocated_bytes": 627228672,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-s-pre98",
+      "bot": "Suckhoe",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/suckhoe-upgrade-pre-9.8-20261003-151311",
+      "allocated_bytes": 981426176,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-s-pre99",
+      "bot": "Suckhoe",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/openclaw-suckhoe-pre99-20261009",
+      "allocated_bytes": 332038144,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-s-lcm",
+      "bot": "Suckhoe",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/lcm-111-suckhoe-20261015-172413",
+      "allocated_bytes": 112025600,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-n-pre98",
+      "bot": "Nemo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/nemo-sandbox-pre-9.8-20261003-150103",
+      "allocated_bytes": 118378496,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-n-101",
+      "bot": "Nemo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/nemo-upgrade-10.1-20261012-134648",
+      "allocated_bytes": 632537088,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-n-102",
+      "bot": "Nemo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/nemo-upgrade-10.2-20261013-113641",
+      "allocated_bytes": 622137344,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-n-first-attempt",
+      "bot": "Nemo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/nemo-10.3-lcm-20261014-211052",
+      "allocated_bytes": 626339840,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "old-n-sol",
+      "bot": "Nemo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/backups/nemo-sol-fallback-20261007",
+      "allocated_bytes": 6676480,
+      "reason": "Superseded backup candidate under one complete recovery set per bot policy.",
+      "gates": [
+        "verify-retained-set-coverage",
+        "fresh-path-and-reference-check",
+        "no-active-backup-or-restore-lock",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "n-runtime98",
+      "bot": "Nemo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/sandbox-nemo/runtime-9.8",
+      "allocated_bytes": 770961408,
+      "reason": "Old runtime or isolated rehearsal/failed-state artifact; not serving data.",
+      "gates": [
+        "remove-stopped-nemo-sandbox-9.8-in-same-reviewed-group",
+        "readable-proc-scan-has-root-blind-spots",
+        "fresh-path-and-reference-check",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "n-runtime101",
+      "bot": "Nemo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/sandbox-nemo/runtime-10.1",
+      "allocated_bytes": 641658880,
+      "reason": "Old runtime or isolated rehearsal/failed-state artifact; not serving data.",
+      "gates": [
+        "remove-stopped-nemo-sandbox-10.1-in-same-reviewed-group",
+        "readable-proc-scan-has-root-blind-spots",
+        "fresh-path-and-reference-check",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "n-failed-config",
+      "bot": "Nemo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/sandbox-nemo/config.failed-10.3-lcm-20261014-211943",
+      "allocated_bytes": 1340977152,
+      "reason": "Old runtime or isolated rehearsal/failed-state artifact; not serving data.",
+      "gates": [
+        "confirm-no-required-unique-post-backup-data",
+        "readable-proc-scan-has-root-blind-spots",
+        "fresh-path-and-reference-check",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "n-rehearsal-config",
+      "bot": "Nemo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/sandbox-nemo/ops-10.3-lcm-20261014/rehearsal-config",
+      "allocated_bytes": 859713536,
+      "reason": "Old runtime or isolated rehearsal/failed-state artifact; not serving data.",
+      "gates": [
+        "remove-stopped-nemo-rehearsal-103-lcm-first",
+        "readable-proc-scan-has-root-blind-spots",
+        "fresh-path-and-reference-check",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "n-rehearsal-workspace",
+      "bot": "Nemo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/sandbox-nemo/ops-10.3-lcm-20261014/rehearsal-workspace",
+      "allocated_bytes": 32768,
+      "reason": "Old runtime or isolated rehearsal/failed-state artifact; not serving data.",
+      "gates": [
+        "remove-stopped-nemo-rehearsal-103-lcm-first",
+        "readable-proc-scan-has-root-blind-spots",
+        "fresh-path-and-reference-check",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "n-stage",
+      "bot": "Nemo",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/sandbox-nemo/ops-10.3-lcm-20261014/stage-home",
+      "allocated_bytes": 327127040,
+      "reason": "Old runtime or isolated rehearsal/failed-state artifact; not serving data.",
+      "gates": [
+        "confirm-no-current-stage-or-rollback-reference",
+        "readable-proc-scan-has-root-blind-spots",
+        "fresh-path-and-reference-check",
+        "separate-explicit-delete-GO"
+      ]
+    },
+    {
+      "id": "hermes-old-1018",
+      "bot": "Hermes",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/.hermes/backups/pre-update-2026-10-18-101808.zip",
+      "allocated_bytes": 239927296,
+      "reason": "Older full-state zip",
+      "gates": ["validate-latest-retained-recovery-set", "separate-explicit-delete-GO"]
+    },
+    {
+      "id": "hermes-old-1240",
+      "bot": "Hermes",
+      "status": "PROPOSE_REMOVE_CONDITIONAL",
+      "path": "/home/hung/.hermes/backups/pre-update-2026-10-18-124040.zip",
+      "allocated_bytes": 241025024,
+      "reason": "Older full-state zip",
+      "gates": ["validate-latest-retained-recovery-set", "separate-explicit-delete-GO"]
+    },
+    {
+      "id": "hold-h-captures",
+      "bot": "Hungreo",
+      "status": "HOLD",
+      "path": "/home/hung/.openclaw-hungreo/tmp/plugin-captures",
+      "allocated_bytes": 1066573824,
+      "reason": "PID1237 actively references child0d054beb; other children not proven disposable.",
+      "gates": []
+    },
+    {
+      "id": "hold-s-captures",
+      "bot": "Suckhoe",
+      "status": "HOLD",
+      "path": "/home/hung/.openclaw-suckhoe/tmp/plugin-captures",
+      "allocated_bytes": 995254272,
+      "reason": "PID1211 actively references child4ae86e51; other children not proven disposable.",
+      "gates": []
+    },
+    {
+      "id": "hold-n-captures",
+      "bot": "Nemo",
+      "status": "HOLD",
+      "path": "/home/hung/sandbox-nemo/config/tmp/plugin-captures",
+      "allocated_bytes": 522227712,
+      "reason": "Serving PID1422 references /sandbox/config/tmp/plugin-captures/4bbb158f, mapped to this host tree.",
+      "gates": []
+    },
+    {
+      "id": "hold-runtime0924",
+      "bot": "Shared",
+      "status": "HOLD",
+      "path": "/home/hung/openclaw-upgrade-20260924",
+      "allocated_bytes": 817475584,
+      "reason": "Running H/S Node executable resolves here.",
+      "gates": []
+    },
+    {
+      "id": "hold-runtime1003",
+      "bot": "Shared",
+      "status": "HOLD",
+      "path": "/home/hung/openclaw-upgrade-20261003",
+      "allocated_bytes": 770965504,
+      "reason": "H/S service Node/loader path points here.",
+      "gates": []
+    },
+    {
+      "id": "hold-runtime1008",
+      "bot": "Shared",
+      "status": "HOLD",
+      "path": "/home/hung/openclaw-upgrade-20261008-99",
+      "allocated_bytes": 1311281152,
+      "reason": "Serving H/S core9.9 runtime.",
+      "gates": []
+    },
+    {
+      "id": "hold-n-runtime102",
+      "bot": "Nemo",
+      "status": "HOLD",
+      "path": "/home/hung/sandbox-nemo/runtime-10.2",
+      "allocated_bytes": 642383872,
+      "reason": "Only retained Nemo rollback version, coupled to kept backup+container10.2.",
+      "gates": []
+    },
+    {
+      "id": "hold-n-runtime103",
+      "bot": "Nemo",
+      "status": "HOLD",
+      "path": "/home/hung/sandbox-nemo/runtime-10.3",
+      "allocated_bytes": 642519040,
+      "reason": "Serving Nemo core10.3.",
+      "gates": []
+    },
+    {
+      "id": "hold-n-legacy",
+      "bot": "Nemo",
+      "status": "HOLD",
+      "path": "/home/hung/.openclaw-nemotron",
+      "allocated_bytes": 979509248,
+      "reason": "Legacy data coverage and remaining references not certified.",
+      "gates": []
+    },
+    {
+      "id": "hold-hermes-snapshot",
+      "bot": "Hermes",
+      "status": "HOLD",
+      "path": "/home/hung/.hermes/state-snapshots",
+      "allocated_bytes": 179232768,
+      "reason": "Separate quick-snapshot restore path; validate replacement before consolidating to one set.",
+      "gates": []
+    },
+    {
+      "id": "hold-kb",
+      "bot": "Shared",
+      "status": "HOLD",
+      "path": "/home/hung/backups/openclaw/kb",
+      "allocated_bytes": 9322496,
+      "reason": "External KB/scripts/crontab companion data; latest set may be component of recovery package; no pruning yet.",
+      "gates": []
+    }
+  ],
+  "candidate_allocated_bytes": 13431689216,
+  "candidate_by_bot": {
+    "Hungreo": 5329788928,
+    "Suckhoe": 1674407936,
+    "Nemo": 5946540032,
+    "Hermes": 480952320
+  },
+  "docker_conditional_writable_bytes": 211271680,
+  "docker_conditional_remove": ["nemo-rehearsal-103-lcm", "nemo-sandbox-10.1", "nemo-sandbox-9.8"],
+  "docker_protect": ["nemo-sandbox", "nemo-sandbox-10.2", "n8n", "n8n-caddy"],
+  "limitations": [
+    "No deletion or retention changes authorized.",
+    "Read-only /proc scan could not read118fd directories; absence of match is not proof of no references.",
+    "Production config_machine_state full-value query blocked by automatic review and abandoned; no bypass used.",
+    "Latest Hermes CRC/schema-name coverage is not a full restore/boot certificate.",
+    "Future release date/version not checked; not used as deletion gate.",
+    "Nemo retained14/10 set is pre10.3 rollback state, not a current10.3 data backup; daily backup producer covers only Hungreo/Suckhoe. Fresh consistent current-state backup needs separate scoped GO before later risky maintenance."
+  ]
+}

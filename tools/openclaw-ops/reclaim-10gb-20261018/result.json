@@ -1,0 +1,42 @@
+{
+  "status": "VERIFIED",
+  "completed_at_vnt": "2026-10-18T17:11:30+07:00",
+  "postcheck_at_vnt": "2026-10-18T17:12:33+07:00",
+  "df_used_before": 85362089984,
+  "df_used_after": 75223420928,
+  "df_reclaimed_bytes": 10138669056,
+  "postcheck_available_bytes": 27646242816,
+  "postcheck_used_percent": 74,
+  "removed_directories": 14,
+  "removed_stopped_containers": ["nemo-sandbox-9.8", "nemo-sandbox-10.1"],
+  "retained_checksum_sets": 8,
+  "retained_checksums_verified": 104,
+  "versions": {
+    "hungreo": "2026.9.33",
+    "suckhoe": "2026.9.33",
+    "nemo": "2026.10.4"
+  },
+  "unchanged_pids": {
+    "hungreo": 329781,
+    "suckhoe": 327653,
+    "hermes": 268895,
+    "nemo": 310335
+  },
+  "service_config_hashes_unchanged": true,
+  "protected_containers_unchanged": true,
+  "readyz": {
+    "18789": 200,
+    "18795": 200,
+    "18796": 200
+  },
+  "pending_directories_remaining": 0,
+  "new_unit_log_flags": {
+    "out_of_memory": 0,
+    "oom_kill": 0,
+    "secrets_degraded": 0,
+    "uncaught_exception": 0
+  },
+  "root_reference_checks": "0 matches;0 permission denials before each delete",
+  "guard_tests": 12,
+  "independent_review": "APPROVE after guard fixes and mount-order normalization"
+}

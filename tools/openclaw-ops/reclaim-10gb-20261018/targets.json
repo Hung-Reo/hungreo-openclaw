@@ -1,0 +1,86 @@
+{
+  "host": "srv1367812",
+  "authorization": "Hung GO reclaim about10GB; resumed after Antigravity upgrades complete18/10",
+  "paths": [
+    "/home/hung/backups/openclaw/hungreo/20261017-021548",
+    "/home/hung/backups/openclaw/suckhoe/20261017-021548",
+    "/home/hung/backups/hungreo-upgrade-pre-9.8-20261003-153601",
+    "/home/hung/backups/openclaw-hungreo-pre99-20261008",
+    "/home/hung/backups/lcm-111-hungreo-20261015-182918",
+    "/home/hung/backups/suckhoe-upgrade-pre-9.8-20261003-151311",
+    "/home/hung/backups/openclaw-suckhoe-pre99-20261009",
+    "/home/hung/backups/lcm-111-suckhoe-20261015-172413",
+    "/home/hung/backups/nemo-sandbox-pre-9.8-20261003-150103",
+    "/home/hung/backups/nemo-upgrade-10.1-20261012-134648",
+    "/home/hung/backups/nemo-upgrade-10.2-20261013-113641",
+    "/home/hung/backups/nemo-10.3-lcm-20261014-211052",
+    "/home/hung/sandbox-nemo/runtime-9.8",
+    "/home/hung/sandbox-nemo/runtime-10.1"
+  ],
+  "expected_proposal_bytes": 10006917120,
+  "remove_stopped_containers": ["nemo-sandbox-9.8", "nemo-sandbox-10.1"],
+  "protect_containers": [
+    "nemo-sandbox",
+    "nemo-sandbox-10.3",
+    "nemo-sandbox-10.2",
+    "nemo-rehearsal-103-lcm",
+    "n8n",
+    "n8n-caddy"
+  ],
+  "keep_backup_sets": [
+    "/home/hung/backups/openclaw/hungreo/20261018-021528",
+    "/home/hung/backups/openclaw/suckhoe/20261018-021528",
+    "/home/hung/backups/nemo-10.3-lcm-20261014-212310",
+    "/home/hung/backups/nemo-10.4-20261018-154116",
+    "/home/hung/backups/openclaw-hungreo-pre933-20261018-154744",
+    "/home/hung/backups/openclaw-suckhoe-pre933-20261018-154622",
+    "/home/hung/backups/post933-cleanup-hungreo-20261018-164201",
+    "/home/hung/backups/post933-cleanup-suckhoe-20261018-163847"
+  ],
+  "runtime_packages": {
+    "hungreo": "/home/hung/openclaw-upgrade-20261018-933/runtime/node_modules/openclaw/package.json",
+    "suckhoe": "/home/hung/openclaw-upgrade-20261018-933/runtime/node_modules/openclaw/package.json",
+    "nemo": "/home/hung/sandbox-nemo/runtime-10.4/node_modules/openclaw/package.json"
+  },
+  "versions": {
+    "hungreo": "2026.9.33",
+    "suckhoe": "2026.9.33",
+    "nemo": "2026.10.4"
+  },
+  "required_backup_members": {
+    "/home/hung/backups/openclaw/hungreo/20261018-021528": ["state.tgz", "sqlite.tgz"],
+    "/home/hung/backups/openclaw/suckhoe/20261018-021528": ["state.tgz", "sqlite.tgz"],
+    "/home/hung/backups/nemo-10.3-lcm-20261014-212310": ["config.tar", "workspace.tar"],
+    "/home/hung/backups/nemo-10.4-20261018-154116": ["config.tar", "workspace.tar"],
+    "/home/hung/backups/openclaw-hungreo-pre933-20261018-154744": [
+      "canonical-before.sqlite",
+      "openclaw.json",
+      "peer-records-before.json",
+      "zzzzz-upgrade-99.conf",
+      "openclaw-cli",
+      "openclaw-healthcheck.sh"
+    ],
+    "/home/hung/backups/openclaw-suckhoe-pre933-20261018-154622": [
+      "canonical-before.sqlite",
+      "openclaw.json",
+      "peer-records-before.json",
+      "zzzzz-upgrade-99.conf",
+      "openclaw-cli",
+      "openclaw-healthcheck.sh"
+    ],
+    "/home/hung/backups/post933-cleanup-hungreo-20261018-164201": [
+      "openclaw.json",
+      "state/openclaw.sqlite",
+      "npm-projects-pre.tgz",
+      "systemd/openclaw-gateway-hungreo.service",
+      "healthcheck_timer_state"
+    ],
+    "/home/hung/backups/post933-cleanup-suckhoe-20261018-163847": [
+      "openclaw.json",
+      "state/openclaw.sqlite",
+      "npm-projects-pre.tgz",
+      "systemd/openclaw-gateway-suckhoe.service",
+      "healthcheck_timer_state"
+    ]
+  }
+}

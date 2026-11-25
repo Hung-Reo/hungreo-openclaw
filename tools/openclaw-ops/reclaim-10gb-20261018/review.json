@@ -1,0 +1,21 @@
+{
+  "review": "APPROVE after fixes",
+  "reviewer": "fresh-context gpt-6.1-sol high reviewer",
+  "resolved_findings": [
+    "Mount recheck per deletion before/after rename",
+    "Required backup artifacts must have verified SHA; pin manifest digest",
+    "Normalize unordered Docker mount arrays; genuine mount-source changes still detected"
+  ],
+  "local_guard_tests": 12,
+  "production_guard_tests": 12,
+  "files_sha256": {
+    "20_verify.sh": "d4713ab133713cd312d268ea32d8ee7396afb9d54d7d2e5b4ec38515e2ce27b7",
+    "targets.json": "78d0e9cc92507f31b72840c0153d02cf4224856b55df8e7989a94e0e897f80c4",
+    "cleanup.py": "89c93f9e0883f39da754b3b3074fef24cff3af59946befc13e632405bfdab3d8",
+    "test_guards.py": "5e07fec7dd3ef7f0a1a2cf070b899782b6ab4d4cddf3942a286d520e5285b10f",
+    "00_precheck.sh": "d2aa86dd3f965ac222fe896f58608baddccc07e897e2d1717138ec970abb7060",
+    "10_apply.sh": "aecbb19b28bb976cdceef74b926f2d85038d2d83c1c606aae70e4fc65ee0f1a0",
+    "root_refs.js": "81788338a930df0c003441b917104239449595ac1a3a0c257a926768038766c4"
+  },
+  "limits": "Static review; live checks required. Cooperative lock, no concurrent upgrade/backup/restore/mount permitted."
+}
