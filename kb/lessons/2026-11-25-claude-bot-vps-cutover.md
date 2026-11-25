@@ -36,6 +36,13 @@ ls -t ~/.claude/projects/*/*.jsonl | head -1   # transcript (jq để đọc too
 VPS `systemctl --user stop claude-collab && systemctl --user disable claude-collab` → Mac `rm ~/collab-bot/MOVED-TO-VPS` → chạy `mac-collab-hub-20261103/start-claude-collab.sh`.
 Gỡ hẳn: `sudo bash ~/claude-bot-vps-20261125/99_b1_rollback_root.sh`.
 
+## B6 voice + profile (25/11 16:30)
+- whisper.cpp v1.9.5 (cùng bản Mac) build không cần sudo bằng cmake bản tải: `tools/openclaw-ops/claude-bot-vps-20261125/20_b6_build_whisper.sh`. Binary ở `~claudebot/.local/opt/whisper.cpp-1.9.5/bin/whisper-cli`, model `ggml-small-q5_1.bin` (190MB) trong `~/.claude/channels/telegram-collab/voice/models/`.
+- Đo: voice 20s → 10.8s, RAM 474MB (2 vCPU). Plugin VPS vá đường dẫn, `whisper: 100_000`, `jobMs: 140_000`. Backup `voice-backup-20261125-pre-vps-b6/`. Voice DM thật PASS 16:30 (`outcome=transcript`, `wake_reason=dm`).
+- Bot Mac chạy `--setting-sources user` nên nạp cả `~/.claude` của Mac (CLAUDE.md, soul.md, hook guardrails, skills). Khi chuyển máy phải chép bù: đã chép CLAUDE.md, soul.md, `guardrails.sh` (PreToolUse Bash), agent Explore, 8 skill portable. Không chép gstack (cần binary Mac).
+- CI của fork không chạy (runner `blacksmith-*` của upstream) → quét secret thủ công trước khi merge.
+- Hưng giữ connector claude.ai cho bot VPS (không chặn).
+
 ## Còn mở
 - Login hết khoảng 24/12/2026 → `sudo -iu claudebot` + `claude auth login`.
 - Token setup-token thừa ở `~claudebot/.config/claude-collab/oauth`: thu hồi trên claude.ai rồi xoá file.
