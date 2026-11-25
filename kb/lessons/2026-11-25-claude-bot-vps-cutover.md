@@ -49,7 +49,7 @@ Gỡ hẳn: `sudo bash ~/claude-bot-vps-20261125/99_b1_rollback_root.sh`.
 - `handoff/README.md`: TASK (bot ghi) / RESULT (app PC ghi), TASK không phải GO.
 - `claude-login-check.timer` (user claudebot, 08:30 VNT) đọc `loginExpiresAt` trong `claude auth status --json`, còn ≤ 5 ngày thì DM Hưng qua bot.
 
-## Menu 5 lệnh + overlay chống mất bản vá (25/11 tối, chưa deploy)
+## Menu 5 lệnh + overlay chống mất bản vá (deploy 25/11 18:45, backup ~/backups/menu-overlay-20261125-184549 + plugin-overlay-20261125-184558)
 - VERIFIED docs: marketplace `claude-plugins-official` **tự update mặc định**; bản mới vào thư mục version mới, thư mục cũ (đã vá) bị xoá sau 14 ngày ([plugins/loading](https://code.claude.com/docs/en/plugins/loading)). Tắt bằng `autoUpdate:false` trong `known_marketplaces.json`.
 - Không tách plugin ra ngoài cache: `--channels` với plugin local cần `--dangerously-load-development-channels`, chỉ chạy interactive và có hộp xác nhận ([channels-reference](https://code.claude.com/docs/en/channels-reference)) → không hợp systemd.
 - Bẫy đã gặp: `vps-bundle/plugin/` từng chỉ có trên Mac, chưa commit, và lệch VPS 3 file (`server.ts`, `voice-pipeline.ts`, `voice-stt.ts` sau B6). Giờ nguồn chuẩn = `vps-bundle/plugin/` + `MANIFEST.sha256`; launcher chạy `plugin-overlay.sh check`, lệch thì DM 1 lần rồi dừng (fail-closed).
