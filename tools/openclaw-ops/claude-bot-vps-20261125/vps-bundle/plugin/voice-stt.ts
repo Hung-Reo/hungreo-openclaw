@@ -1,7 +1,7 @@
 // Local STT for one voice: capped download → ffmpeg wav 16k → duration check → whisper-cli -l vi.
 // No network except the Telegram file download. Child processes are killed as a group on abort.
 import { spawn } from 'child_process'
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tooLong, wavDurationSec } from './voice-wav.ts'
 import type { SttResult } from './voice-pipeline.ts'
@@ -9,6 +9,16 @@ import type { SttResult } from './voice-pipeline.ts'
 export const MAX_VOICE_BYTES = 2 * 1024 * 1024
 export const FFMPEG = '/usr/bin/ffmpeg'
 export const WHISPER = '/home/claudebot/.local/opt/whisper.cpp-1.9.5/bin/whisper-cli'
+// VOICE-QUALITY-20261127: ưu tiên faster-whisper small + VAD + tên riêng (công thức của Rùa). A/B 25–27/11 trên
+// 5 voice thật: nhanh hơn whisper.cpp và đúng tên; còn whisper.cpp + --prompt thì bịa câu. Thiếu venv/worker → whisper.cpp như cũ.
+export const FW_PYTHON = '/home/claudebot/.local/opt/faster-whisper-venv/bin/python'
+export const FW_WORKER = '/home/claudebot/collab-hub/voice-fw-worker.py'
+
+export function sttCommand(model: string, wavPath: string, has: (p: string) => boolean = existsSync,
+  whisper = WHISPER): { cmd: string; args: string[]; engine: 'faster-whisper' | 'whisper.cpp' } {
+  if (has(FW_PYTHON) && has(FW_WORKER)) return { cmd: FW_PYTHON, args: ['-I', FW_WORKER, wavPath], engine: 'faster-whisper' }
+  return { cmd: whisper, args: ['-m', model, '-f', wavPath, '-l', 'vi', '-nt', '-np'], engine: 'whisper.cpp' }
+}
 export const STEP_MS = { download: 15_000, ffmpeg: 10_000, whisper: 100_000 }
 
 class StepError extends Error { constructor(readonly code: 'too_long' | 'failed' | 'aborted') { super(code) } }
@@ -88,6 +98,7 @@ export async function sttVoice(a: {
   model: string
   ffmpeg?: string
   whisper?: string
+  has?: (p: string) => boolean  // tests only
   stepMs?: Partial<typeof STEP_MS>  // tests only
 }): Promise<SttResult> {
   const ms = { ...STEP_MS, ...a.stepMs }
@@ -107,8 +118,8 @@ export async function sttVoice(a: {
     let sec: number
     try { sec = wavDurationSec(readFileSync(wavPath)) } catch { throw new StepError('failed') }
     if (tooLong(sec)) throw new StepError('too_long')
-    const text = await run(a.whisper ?? WHISPER, ['-m', a.model, '-f', wavPath, '-l', 'vi', '-nt', '-np'],
-      linked(a.signal, ms.whisper))
+    const stt = sttCommand(a.model, wavPath, a.has, a.whisper ?? WHISPER)
+    const text = await run(stt.cmd, stt.args, linked(a.signal, ms.whisper))
     return { ok: true, text }
   } catch (e) {
     return { ok: false, code: e instanceof StepError ? e.code : 'failed' }

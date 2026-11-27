@@ -13,8 +13,8 @@ SCP=(scp -q -o ConnectTimeout=10 -i "$HOME/.ssh/hostinger_kvm2")
 DEST=claudebot@72.61.123.33
 
 # Các bản đã từng chạy (đo 25/11). Lần 1 (18:45): launcher ebb4649b…/server 45d2aff7…; lần 2: aafc32a2…/a35fb740…
-EXPECT_LAUNCHER="ebb4649b448e3608a2efa929294b7ae8fe2edc77616afcecc64ad77fdedde9cf,aafc32a26320f34026ea00e08bc622dbb336ec56a8ff386cd4f81cbcb2fa19a7,5097c367b76173e035c25094a6a659cc688684eba8f8be700f1999ec924e9092"
-EXPECT_SERVER="45d2aff7ac797f280cfc2e46788af6983e07cf9c0d98c10b467385f29156fad4,a35fb740b0f2da24dc36c19f0ea5b7b1e2cc0079252093162803f9ccfccb9f32"
+EXPECT_LAUNCHER="ebb4649b448e3608a2efa929294b7ae8fe2edc77616afcecc64ad77fdedde9cf,aafc32a26320f34026ea00e08bc622dbb336ec56a8ff386cd4f81cbcb2fa19a7,5097c367b76173e035c25094a6a659cc688684eba8f8be700f1999ec924e9092,f355357034a44ad784f5ff10e4b729ebb700298f86a80b5eb9f3994ae3be9866"
+EXPECT_SERVER="45d2aff7ac797f280cfc2e46788af6983e07cf9c0d98c10b467385f29156fad4,a35fb740b0f2da24dc36c19f0ea5b7b1e2cc0079252093162803f9ccfccb9f32,3840eaa50c5fa546a21fda097c484d0c0d1116d3ce2d9d6946d06a9fb469f91d"
 NEW_SERVER="$(shasum -a 256 "$B/plugin/server.ts" | cut -d' ' -f1)"
 
 echo "1) Test local"
@@ -46,6 +46,7 @@ echo "4) Chép overlay + launcher + plugin-overlay.sh"
 "${SSH[@]}" "mkdir -p ~/collab-hub/plugin-overlay.new"
 "${SCP[@]}" "$B/plugin/MANIFEST.sha256" "$B/plugin/.mcp.json" "$B"/plugin/*.ts "$DEST:collab-hub/plugin-overlay.new/"
 "${SCP[@]}" "$B/hub/plugin-overlay.sh" "$DEST:collab-hub/plugin-overlay.sh.new"
+"${SCP[@]}" "$B/hub/voice-fw-worker.py" "$DEST:collab-hub/voice-fw-worker.py.new"
 "${SCP[@]}" "$B/hub/start-claude-collab.sh" "$DEST:collab-hub/start-claude-collab.sh.new"
 "${SSH[@]}" bash -s "$BK" <<'EOF'
 set -euo pipefail
@@ -53,6 +54,8 @@ cd ~/collab-hub
 (cd plugin-overlay.new && sha256sum --quiet -c MANIFEST.sha256)
 rm -rf plugin-overlay && mv plugin-overlay.new plugin-overlay
 install -m 0755 plugin-overlay.sh.new plugin-overlay.sh && rm plugin-overlay.sh.new
+install -m 0644 voice-fw-worker.py.new voice-fw-worker.py && rm voice-fw-worker.py.new
+python3 -m py_compile voice-fw-worker.py && rm -rf __pycache__
 install -m 0755 start-claude-collab.sh.new start-claude-collab.sh && rm start-claude-collab.sh.new
 bash -n start-claude-collab.sh
 echo "4b) Chuyển ID voice từ code ra STATE_DIR (repo public không chứa ID)"
