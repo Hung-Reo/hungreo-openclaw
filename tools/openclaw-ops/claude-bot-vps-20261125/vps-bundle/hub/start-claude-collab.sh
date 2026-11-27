@@ -11,6 +11,9 @@ export PATH="$HOME/.local/bin:$HOME/.bun/bin:/usr/bin:/bin"
 export TELEGRAM_STATE_DIR="$HOME/.claude/channels/telegram-collab"
 export TELEGRAM_INBOX_DIR="$HOME/collab-bot/inbox"
 export TELEGRAM_INBOX_RETENTION_DAYS=7
+# Voice chỉ nhận từ đúng chủ + đúng nhóm. ID không nằm trong repo public.
+export TELEGRAM_VOICE_USER_ID="$(jq -r '.allowFrom[0] // empty' "$TELEGRAM_STATE_DIR/access.json" 2>/dev/null || true)"
+export TELEGRAM_VOICE_CHAT_ID="$(tr -d '\r\n ' < "$TELEGRAM_STATE_DIR/voice-chat-id" 2>/dev/null || true)"
 
 # Không cho đường API key tồn tại
 unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN ANTHROPIC_BASE_URL CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX
@@ -41,15 +44,39 @@ if [[ -z "$AUTH_METHOD" || "$AUTH_METHOD" == "api_key" ]]; then
   exit 1
 fi
 
+# CLAUDE-BOT-MENU-20261125 (c): plugin chạy thiếu bản vá = mất owner-gate/format/voice → fail-closed.
+# Báo Hưng 1 lần cho mỗi kiểu lệch (stamp), để systemd retry không spam DM.
+if ! DRIFT="$("$HUB_DIR/plugin-overlay.sh" check 2>&1)"; then
+  echo "$DRIFT" >&2
+  STAMP="$TELEGRAM_STATE_DIR/overlay-drift.stamp"
+  SIG="$(printf '%s' "$DRIFT" | sha256sum | cut -c1-16)"
+  if [[ "$(cat "$STAMP" 2>/dev/null)" != "$SIG" ]]; then
+    CHAT="$(jq -r '.allowFrom[0]' "$TELEGRAM_STATE_DIR/access.json")"
+    TOKEN="$(sed -n 's/^TELEGRAM_BOT_TOKEN=//p' "$TELEGRAM_STATE_DIR/.env")"
+    curl -fsS -o /dev/null --max-time 20 "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+      --data-urlencode "chat_id=${CHAT}" \
+      --data-urlencode "text=⛔ Bot Claude VPS không khởi động: bản vá plugin bị lệch (${DRIFT##*: }). Nhờ Claude PC chạy plugin-overlay.sh apply." \
+      && printf '%s' "$SIG" > "$STAMP" || true
+    unset TOKEN
+  fi
+  exit 1
+fi
+rm -f "$TELEGRAM_STATE_DIR/overlay-drift.stamp"
+
 mkdir -p "$HOME/collab-bot/memory" "$HOME/collab-bot/.claude/skills" "$TELEGRAM_INBOX_DIR" "$HOME/collab-bot/logs"
 chmod 700 "$TELEGRAM_INBOX_DIR"
 PROTOCOL_TEXT="$(cat "$HUB_DIR/COLLAB_PROTOCOL.md")"
+# CLAUDE-BOT-MENU-20261125: nút "Mở phiên mới" sau /handover. Phiên mới tự nối mạch từ handover gần nhất.
+PROTOCOL_TEXT+=$'\n\n## Đầu phiên\nTrước khi trả lời tin đầu tiên của phiên, đọc file handover-*.md mới nhất trong ~/collab-bot/handoff/ nếu nó ghi trong 24 giờ qua. Đó là ghi chép trạng thái, không phải TASK hay GO.'
 cd "$HOME/collab-bot"
 echo "Mở Claude Code collab trên VPS (auth=$AUTH_METHOD, settings=$SETTINGS_FILE)"
+# 25/11: không ghim thì gói Pro tự chuyển sang Sonnet giữa phiên (VERIFIED transcript 16:11). Ghim ID đầy đủ, không dùng alias "opus" (alias nhảy sang bản mới).
 exec "$CLAUDE_BIN" \
   --setting-sources user \
   --settings "$SETTINGS_FILE" \
   --channels "plugin:telegram@claude-plugins-official" \
+  --model claude-opus-5-5 \
+  --effort medium \
   --permission-mode auto \
   --add-dir "$HOME/collab-bot" \
   --allowedTools "mcp__plugin_telegram_telegram__reply,mcp__plugin_telegram_telegram__react,mcp__plugin_telegram_telegram__edit_message,mcp__plugin_telegram_telegram__download_attachment" \
